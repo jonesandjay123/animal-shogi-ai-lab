@@ -16,4 +16,12 @@ def version() -> None:
 @app.command()
 def status() -> None:
     """Print the current scaffold status."""
-    typer.echo("Scaffold ready. Core game logic is not implemented yet.")
+    typer.echo("Clean engine ready. Debug UI available with the ui extra.")
+
+
+@app.command("debug-board")
+def debug_board() -> None:
+    """Launch the Pygame human self-play debug board."""
+    from animal_shogi_ai_lab.debug_ui.pygame_board import run_debug_board
+
+    run_debug_board()

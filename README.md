@@ -53,9 +53,32 @@ python3 -m pytest
 Run the verification commands from an activated virtual environment so the
 project's dev dependencies, including `pytest`, are available.
 
+## Debug Board
+
+The Pygame debug board is a human self-play tool for validating the engine. It
+does not implement game rules itself; all legal moves and drops come from the
+engine API.
+
+```bash
+source .venv/bin/activate
+pip install -e ".[dev,ui]"
+animal-shogi-lab debug-board
+```
+
+Controls:
+
+- Click one of the side-to-move's board pieces to highlight legal moves.
+- Click one of the side-to-move's hand pieces to highlight legal drops.
+- Press `R` to reset.
+- Press `Esc` or close the window to quit.
+
+Each successful action also prints `GameState.render_ascii()` to the terminal.
+
 ## Current Status
 
-Scaffold only. Core game logic is intentionally not implemented yet.
+Clean rules engine MVP is implemented and covered by focused tests. The Pygame
+debug board is intentionally a lightweight engine validation tool, not a
+polished UI.
 
 ## Handoff Notes
 

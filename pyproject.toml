@@ -23,6 +23,9 @@ dev = [
   "pytest>=8.2",
   "ruff>=0.4"
 ]
+ui = [
+  "pygame>=2.6"
+]
 rl = [
   "torch>=2.3",
   "gymnasium>=0.29"
