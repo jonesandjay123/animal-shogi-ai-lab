@@ -208,6 +208,9 @@ class GameState:
     def terminal_result(self) -> TerminalResult | None:
         return self._terminal_result
 
+    def render_ascii(self) -> str:
+        return render_ascii(self)
+
     def legal_actions(self) -> list[Action]:
         if self.is_terminal():
             return []
@@ -399,6 +402,57 @@ def all_squares() -> tuple[Square, ...]:
     return tuple(Square(file, rank) for rank in range(BOARD_HEIGHT) for file in range(BOARD_WIDTH))
 
 
+def render_ascii(state: GameState) -> str:
+    lines = [f"White hand: {_format_hand(state.hands[Player.WHITE])}"]
+    for rank in reversed(range(BOARD_HEIGHT)):
+        cells = [
+            _piece_symbol(state.board.get(Square(file, rank)))
+            for file in range(BOARD_WIDTH)
+        ]
+        lines.append(f"r{rank} | {' '.join(cells)}")
+    lines.extend(
+        [
+            "     f0 f1 f2",
+            f"Black hand: {_format_hand(state.hands[Player.BLACK])}",
+            f"Turn: {state.side_to_move.value}",
+        ]
+    )
+    if state._terminal_result is not None:
+        winner = (
+            "None"
+            if state._terminal_result.winner is None
+            else state._terminal_result.winner.value
+        )
+        lines.append(f"Terminal: {state._terminal_result.reason.value} winner={winner}")
+    return "\n".join(lines)
+
+
+def _format_hand(hand: dict[PieceKind, int]) -> str:
+    parts = [
+        f"{_piece_kind_symbol(kind)} x{hand.get(kind, 0)}"
+        for kind in DROP_PIECE_KINDS
+        if hand.get(kind, 0) > 0
+    ]
+    return ", ".join(parts) if parts else "-"
+
+
+def _piece_symbol(piece: Piece | None) -> str:
+    if piece is None:
+        return "."
+    symbol = _piece_kind_symbol(piece.kind)
+    return symbol if piece.owner is Player.BLACK else symbol.lower()
+
+
+def _piece_kind_symbol(kind: PieceKind) -> str:
+    return {
+        PieceKind.LION: "L",
+        PieceKind.GIRAFFE: "G",
+        PieceKind.ELEPHANT: "E",
+        PieceKind.CHICK: "C",
+        PieceKind.HEN: "H",
+    }[kind]
+
+
 def _lion_is_attacked(board: Board, lion_square: Square, attacker: Player) -> bool:
     for square, piece in board.items():
         if piece.owner is not attacker:
@@ -441,4 +495,5 @@ __all__ = [
     "TerminalReason",
     "TerminalResult",
     "all_squares",
+    "render_ascii",
 ]
