@@ -1,0 +1,12 @@
+# Example config for the first self-play smoke test.
+experiment: random-vs-random
+seed: 1
+games: 100
+agents:
+  first:
+    type: random
+  second:
+    type: random
+output:
+  replay_dir: runs/random-vs-random/replays
+  report_path: runs/random-vs-random/report.json

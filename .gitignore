@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+dist/
+build/
+*.egg-info/
+
+# Virtual envs
+.venv/
+venv/
+
+# Local/editor
+.DS_Store
+.idea/
+.vscode/
+
+# Experiment outputs
+runs/
+checkpoints/
+artifacts/
+*.pt
+*.pth
+*.onnx
+
+# Node/web future workspace
+node_modules/
+.next/
+out/
