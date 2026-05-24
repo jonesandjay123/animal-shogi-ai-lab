@@ -147,7 +147,7 @@ def test_debug_board_session_apply_and_undo() -> None:
 
     assert session.state != initial_state
     assert session.history == [initial_state]
-    assert session.move_log == ["move 1,1 -> 1,2"]
+    assert session.move_log == ["B: CHICK 1,1x1,2"]
 
     assert session.undo()
     assert session.state == initial_state

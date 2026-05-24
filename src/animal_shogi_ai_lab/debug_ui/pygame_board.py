@@ -22,6 +22,7 @@ from animal_shogi_ai_lab.engine import (
     PieceKind,
     Player,
     Square,
+    TerminalReason,
 )
 
 WINDOW_WIDTH = 760
@@ -92,12 +93,13 @@ class DebugBoardSession:
 
     def apply_action(self, action: Action) -> None:
         self.history.append(self.state)
+        formatted = _format_action(self.state, action)
         self.state = self.state.apply_action(action)
         self.selection = Selection()
-        self.move_log.append(_format_action(action))
+        self.move_log.append(formatted)
         if len(self.move_log) > 12:
             del self.move_log[:-12]
-        self.status_message = self.move_log[-1]
+        self.status_message = formatted
 
     def undo(self) -> bool:
         if not self.history:
@@ -112,6 +114,7 @@ class DebugBoardSession:
 
     def save(self, path: Path = STATE_SAVE_PATH) -> None:
         path.write_text(json.dumps(self.state.serialize(), indent=2), encoding="utf-8")
+        self.selection = Selection()
         self.status_message = f"Saved {path}"
 
     def load(self, path: Path = STATE_SAVE_PATH) -> bool:
@@ -138,6 +141,26 @@ def build_legal_action_maps(actions: list[Action]) -> LegalActionMaps:
     return LegalActionMaps(moves_by_from=moves_by_from, drops_by_kind=drops_by_kind)
 
 
+def _get_scale_info(window_size: tuple[int, int]) -> tuple[int, int, int, int]:
+    win_w, win_h = window_size
+    target_ratio = WINDOW_WIDTH / WINDOW_HEIGHT
+    curr_ratio = win_w / win_h
+
+    if curr_ratio > target_ratio:
+        # Window is wider: pillarbox
+        new_h = win_h
+        new_w = int(new_h * target_ratio)
+        offset_x = (win_w - new_w) // 2
+        offset_y = 0
+    else:
+        # Window is taller: letterbox
+        new_w = win_w
+        new_h = int(new_w / target_ratio)
+        offset_x = 0
+        offset_y = (win_h - new_h) // 2
+    return new_w, new_h, offset_x, offset_y
+
+
 def run_debug_board() -> None:
     try:
         import pygame
@@ -147,8 +170,12 @@ def run_debug_board() -> None:
         ) from exc
 
     pygame.init()
-    screen = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
+    screen = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT), pygame.RESIZABLE)
     pygame.display.set_caption("Animal Shogi Debug Board")
+    
+    # Virtual canvas/surface for 760x620 rendering
+    canvas = pygame.Surface((WINDOW_WIDTH, WINDOW_HEIGHT))
+
     clock = pygame.time.Clock()
     fonts = {
         "title": pygame.font.SysFont(None, 34),
@@ -191,23 +218,38 @@ def run_debug_board() -> None:
                 elif event.key == pygame.K_a:
                     print(session.state.render_ascii())
             elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-                _handle_click(
-                    pygame=pygame,
-                    session=session,
-                    pos=event.pos,
-                    action_maps=action_maps,
-                    hand_buttons=hand_buttons,
-                )
+                # Translate event.pos to virtual coords
+                new_w, new_h, offset_x, offset_y = _get_scale_info(screen.get_size())
+                px, py = event.pos
+                if offset_x <= px < offset_x + new_w and offset_y <= py < offset_y + new_h:
+                    virtual_x = int((px - offset_x) * WINDOW_WIDTH / new_w)
+                    virtual_y = int((py - offset_y) * WINDOW_HEIGHT / new_h)
+                    _handle_click(
+                        pygame=pygame,
+                        session=session,
+                        pos=(virtual_x, virtual_y),
+                        action_maps=action_maps,
+                        hand_buttons=hand_buttons,
+                    )
 
+        # Draw all elements to the 760x620 canvas
         _draw(
             pygame=pygame,
-            screen=screen,
+            screen=canvas,
             fonts=fonts,
             session=session,
             action_maps=build_legal_action_maps(session.state.legal_actions()),
             hand_buttons=_hand_button_rects(pygame, session.state),
             sprites=sprites,
         )
+        
+        # Scale and blit canvas to screen with black letterbox bars
+        screen.fill((0, 0, 0))
+        new_w, new_h, offset_x, offset_y = _get_scale_info(screen.get_size())
+        if new_w > 0 and new_h > 0:
+            scaled_canvas = pygame.transform.smoothscale(canvas, (new_w, new_h))
+            screen.blit(scaled_canvas, (offset_x, offset_y))
+            
         pygame.display.flip()
         clock.tick(60)
 
@@ -229,6 +271,12 @@ def _handle_click(
         return
 
     clicked_square = _square_from_pos(pos)
+    
+    # Deselect if clicking the same square again
+    if selection.square is not None and clicked_square == selection.square:
+        session.selection = Selection()
+        return
+
     if selection.square is not None and clicked_square is not None:
         action = action_maps.moves_by_from.get(selection.square, {}).get(clicked_square)
         if action is not None:
@@ -244,6 +292,10 @@ def _handle_click(
     for player, kind, rect in hand_buttons:
         if rect.collidepoint(pos):
             if player is state.side_to_move and kind in action_maps.drops_by_kind:
+                # Deselect if clicking the same hand piece kind again
+                if selection.drop_kind == kind:
+                    session.selection = Selection()
+                    return
                 session.selection = Selection(drop_kind=kind)
                 return
             session.selection = Selection()
@@ -261,7 +313,7 @@ def _handle_click(
 def _apply_debug_action(session: DebugBoardSession, action: Action) -> None:
     session.apply_action(action)
     print()
-    print(_format_action(action))
+    print(session.status_message)
     print(session.state.render_ascii())
 
 
@@ -278,14 +330,29 @@ def _draw_header(screen, fonts, session: DebugBoardSession) -> None:
     state = session.state
     title = fonts["title"].render("Animal Shogi Debug Board", True, TEXT)
     screen.blit(title, (24, 20))
-    turn = fonts["body"].render(f"Turn: {state.side_to_move.value}", True, TEXT)
+    
+    if state.is_terminal():
+        turn_text = "Game Over"
+    else:
+        turn_text = f"Turn: {state.side_to_move.value}"
+    turn = fonts["body"].render(turn_text, True, TEXT)
     screen.blit(turn, (24, 58))
+    
     terminal = state.terminal_result()
     if terminal is not None:
-        winner = "DRAW" if terminal.winner is None else terminal.winner.value
-        label = f"Terminal: {terminal.reason.value} winner={winner}"
+        reason_map = {
+            TerminalReason.LION_CAPTURE: "Lion Captured",
+            TerminalReason.SAFE_TRY: "Safe Try (Lion Promoted)",
+            TerminalReason.REPETITION_DRAW: "Repetition Draw",
+        }
+        reason_name = reason_map.get(terminal.reason, terminal.reason.value)
+        if terminal.winner is None:
+            label = f"Draw ({reason_name})"
+        else:
+            label = f"Winner: {terminal.winner.value} ({reason_name})"
         rendered = fonts["body"].render(label, True, TERMINAL)
         screen.blit(rendered, (220, 58))
+        
     if session.status_message:
         rendered = fonts["small"].render(session.status_message, True, MUTED_TEXT)
         screen.blit(rendered, (24, 84))
@@ -425,13 +492,22 @@ def _selected_targets(selection: Selection, action_maps: LegalActionMaps) -> set
     return set()
 
 
-def _format_action(action: Action) -> str:
+def _format_action(state: GameState, action: Action) -> str:
+    player_prefix = "B:" if state.side_to_move is Player.BLACK else "W:"
     if isinstance(action, MoveAction):
+        piece = state.board.get(action.from_square)
+        piece_name = piece.kind.name if piece else "PIECE"
+        target_piece = state.board.get(action.to_square)
+        op = "x" if target_piece else "-"
         return (
-            f"move {action.from_square.file},{action.from_square.rank}"
-            f" -> {action.to_square.file},{action.to_square.rank}"
+            f"{player_prefix} {piece_name} "
+            f"{action.from_square.file},{action.from_square.rank}{op}"
+            f"{action.to_square.file},{action.to_square.rank}"
         )
-    return f"drop {PIECE_LABELS[action.piece_kind]}*{action.to_square.file},{action.to_square.rank}"
+    kind = action.piece_kind.name
+    file = action.to_square.file
+    rank = action.to_square.rank
+    return f"{player_prefix} Drop {kind}*{file},{rank}"
 
 
 __all__ = ["DebugBoardSession", "build_legal_action_maps", "run_debug_board"]
