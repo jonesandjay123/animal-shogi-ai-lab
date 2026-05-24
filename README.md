@@ -46,8 +46,12 @@ Recommended sequence:
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -e ".[dev]"
-pytest
+python3 -m compileall src
+python3 -m pytest
 ```
+
+Run the verification commands from an activated virtual environment so the
+project's dev dependencies, including `pytest`, are available.
 
 ## Current Status
 
