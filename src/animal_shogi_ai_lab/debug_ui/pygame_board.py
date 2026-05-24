@@ -6,6 +6,11 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 
+from animal_shogi_ai_lab.debug_ui.assets import (
+    load_piece_sprites,
+    oriented_sprite,
+    scale_to_fit,
+)
 from animal_shogi_ai_lab.engine import (
     BOARD_HEIGHT,
     BOARD_WIDTH,
@@ -153,6 +158,7 @@ def run_debug_board() -> None:
     }
 
     session = DebugBoardSession.initial()
+    sprites = load_piece_sprites(pygame)
     print(session.state.render_ascii())
 
     running = True
@@ -200,6 +206,7 @@ def run_debug_board() -> None:
             session=session,
             action_maps=build_legal_action_maps(session.state.legal_actions()),
             hand_buttons=_hand_button_rects(pygame, session.state),
+            sprites=sprites,
         )
         pygame.display.flip()
         clock.tick(60)
@@ -258,11 +265,11 @@ def _apply_debug_action(session: DebugBoardSession, action: Action) -> None:
     print(session.state.render_ascii())
 
 
-def _draw(*, pygame, screen, fonts, session, action_maps, hand_buttons) -> None:
+def _draw(*, pygame, screen, fonts, session, action_maps, hand_buttons, sprites) -> None:
     screen.fill(BACKGROUND)
     _draw_header(screen, fonts, session)
-    _draw_board(pygame, screen, fonts, session.state, session.selection, action_maps)
-    _draw_hands(pygame, screen, fonts, session.state, hand_buttons, session.selection)
+    _draw_board(pygame, screen, fonts, session.state, session.selection, action_maps, sprites)
+    _draw_hands(pygame, screen, fonts, session.state, hand_buttons, session.selection, sprites)
     _draw_help(screen, fonts)
     _draw_move_log(screen, fonts, session.move_log)
 
@@ -284,7 +291,7 @@ def _draw_header(screen, fonts, session: DebugBoardSession) -> None:
         screen.blit(rendered, (24, 84))
 
 
-def _draw_board(pygame, screen, fonts, state, selection, action_maps) -> None:
+def _draw_board(pygame, screen, fonts, state, selection, action_maps, sprites) -> None:
     legal_targets = _selected_targets(selection, action_maps)
     for rank in reversed(range(BOARD_HEIGHT)):
         for file in range(BOARD_WIDTH):
@@ -297,13 +304,19 @@ def _draw_board(pygame, screen, fonts, state, selection, action_maps) -> None:
                 pygame.draw.rect(screen, LEGAL, rect.inflate(-14, -14), 4)
             if square == selection.square:
                 pygame.draw.rect(screen, SELECTED, rect.inflate(-8, -8), 4)
-            _draw_piece(screen, fonts, state.board.get(square), rect)
+            _draw_piece(pygame, screen, fonts, state.board.get(square), rect, sprites)
             coord = fonts["small"].render(f"{file},{rank}", True, MUTED_TEXT)
             screen.blit(coord, (rect.left + 5, rect.top + 5))
 
 
-def _draw_piece(screen, fonts, piece: Piece | None, rect) -> None:
+def _draw_piece(pygame, screen, fonts, piece: Piece | None, rect, sprites) -> None:
     if piece is None:
+        return
+    sprite = sprites.get(piece.kind)
+    if sprite is not None:
+        oriented = oriented_sprite(pygame, sprite, piece.owner)
+        scaled = scale_to_fit(pygame, oriented, int(rect.width * 0.82), int(rect.height * 0.82))
+        screen.blit(scaled, scaled.get_rect(center=rect.center))
         return
     label = PIECE_LABELS[piece.kind]
     if piece.owner is Player.WHITE:
@@ -312,7 +325,7 @@ def _draw_piece(screen, fonts, piece: Piece | None, rect) -> None:
     screen.blit(text, text.get_rect(center=rect.center))
 
 
-def _draw_hands(pygame, screen, fonts, state, hand_buttons, selection) -> None:
+def _draw_hands(pygame, screen, fonts, state, hand_buttons, selection, sprites) -> None:
     for player, title_pos, y in [
         (Player.WHITE, (24, 102), 132),
         (Player.BLACK, (24, 362), 392),
@@ -326,8 +339,14 @@ def _draw_hands(pygame, screen, fonts, state, hand_buttons, selection) -> None:
             pygame.draw.rect(screen, color, rect)
             pygame.draw.rect(screen, GRID, rect, 2)
             count = counts.get(kind, 0)
-            label = fonts["body"].render(f"{PIECE_LABELS[kind]} x{count}", True, TEXT)
-            screen.blit(label, label.get_rect(center=rect.center))
+            sprite = sprites.get(kind)
+            if sprite is not None:
+                _draw_hand_sprite(pygame, screen, sprite, Piece(player, kind), rect)
+                label = fonts["small"].render(f"x{count}", True, TEXT)
+                screen.blit(label, (rect.right - 28, rect.bottom - 18))
+            else:
+                label = fonts["body"].render(f"{PIECE_LABELS[kind]} x{count}", True, TEXT)
+                screen.blit(label, label.get_rect(center=rect.center))
         if all(
             counts.get(kind, 0) == 0
             for kind in (PieceKind.CHICK, PieceKind.GIRAFFE, PieceKind.ELEPHANT)
@@ -349,6 +368,12 @@ def _draw_help(screen, fonts) -> None:
     for index, line in enumerate(lines):
         rendered = fonts["small"].render(line, True, MUTED_TEXT)
         screen.blit(rendered, (540, 420 + index * 24))
+
+
+def _draw_hand_sprite(pygame, screen, sprite, piece: Piece, rect) -> None:
+    oriented = oriented_sprite(pygame, sprite, piece.owner)
+    scaled = scale_to_fit(pygame, oriented, int(rect.width * 0.64), int(rect.height * 0.72))
+    screen.blit(scaled, scaled.get_rect(center=(rect.centerx - 10, rect.centery)))
 
 
 def _draw_move_log(screen, fonts, move_log: list[str]) -> None:

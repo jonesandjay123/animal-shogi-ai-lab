@@ -65,6 +65,11 @@ pip install -e ".[dev,ui]"
 animal-shogi-lab debug-board
 ```
 
+The board uses animal sprites from
+`assets/pieces/animal_pieces_sprite_sheet.png` when available. The sprite sheet
+is sliced left-to-right as Chick, Hen, Lion, Giraffe, Elephant. If the image is
+missing or cannot be loaded, the debug board falls back to text labels.
+
 Controls:
 
 - Click one of the side-to-move's board pieces to highlight legal moves.
