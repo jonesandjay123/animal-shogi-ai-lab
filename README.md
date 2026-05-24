@@ -55,4 +55,12 @@ Scaffold only. Core game logic is intentionally not implemented yet.
 
 ## Handoff Notes
 
-Start with `docs/HANDOFF.md`, then `docs/ARCHITECTURE.md` and `docs/GAME_RULES.md`.
+Start with `docs/HANDOFF.md`, then `docs/RULE_RESEARCH_PROMPT.md`.
+
+Recommended phase order:
+
+1. Rule research and `docs/GAME_RULES.md` update.
+2. Legacy repo audit using `docs/LEGACY_AUDIT_PROMPT.md`.
+3. Clean engine implementation.
+4. Baseline agents and evaluation.
+5. RL training.

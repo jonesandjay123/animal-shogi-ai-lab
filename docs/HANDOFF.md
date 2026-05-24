@@ -11,10 +11,13 @@ This repo is prepared as a scaffold for the next Codex implementation pass.
 
 ## What To Build First
 
-1. Implement the core rules engine.
-2. Add unit tests for every rule before adding learning code.
-3. Add random-agent self-play to stress-test legal move generation.
-4. Only then add heuristic/MCTS/RL agents.
+1. Run the rule research phase from `docs/RULE_RESEARCH_PROMPT.md`.
+2. Update and review `docs/GAME_RULES.md`.
+3. Run the legacy audit phase from `docs/LEGACY_AUDIT_PROMPT.md`, if old repos are in scope.
+4. Implement the core rules engine.
+5. Add unit tests for every rule before adding learning code.
+6. Add random-agent self-play to stress-test legal move generation.
+7. Only then add heuristic/MCTS/RL agents.
 
 ## Non-Goals For The First Pass
 
@@ -25,13 +28,6 @@ This repo is prepared as a scaffold for the next Codex implementation pass.
 
 ## Suggested First Codex Task
 
-Implement `animal_shogi_ai_lab.engine` with:
+Use `docs/RULE_RESEARCH_PROMPT.md`.
 
-- 3x4 board model.
-- Pieces: lion, giraffe, elephant, chick, hen.
-- Legal move generation.
-- Captures into hand.
-- Drops from hand.
-- Chick promotion and hen movement.
-- Win conditions.
-- Stable serialization for replays/tests.
+The first Codex task should update the rules spec and stop. It should not implement `animal_shogi_ai_lab.engine` yet.
