@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
+from pathlib import Path
 
 from animal_shogi_ai_lab.engine import (
     BOARD_HEIGHT,
@@ -19,6 +21,7 @@ from animal_shogi_ai_lab.engine import (
 
 WINDOW_WIDTH = 760
 WINDOW_HEIGHT = 620
+STATE_SAVE_PATH = Path("debug_board_state.json")
 BOARD_LEFT = 220
 BOARD_TOP = 100
 CELL_SIZE = 96
@@ -57,6 +60,68 @@ class Selection:
     drop_kind: PieceKind | None = None
 
 
+@dataclass
+class DebugBoardSession:
+    state: GameState
+    selection: Selection
+    move_log: list[str]
+    history: list[GameState]
+    status_message: str = ""
+
+    @classmethod
+    def initial(cls) -> DebugBoardSession:
+        return cls(
+            state=GameState.initial(),
+            selection=Selection(),
+            move_log=[],
+            history=[],
+            status_message="",
+        )
+
+    def reset(self) -> None:
+        self.state = GameState.initial()
+        self.selection = Selection()
+        self.move_log.clear()
+        self.history.clear()
+        self.status_message = "Reset"
+
+    def apply_action(self, action: Action) -> None:
+        self.history.append(self.state)
+        self.state = self.state.apply_action(action)
+        self.selection = Selection()
+        self.move_log.append(_format_action(action))
+        if len(self.move_log) > 12:
+            del self.move_log[:-12]
+        self.status_message = self.move_log[-1]
+
+    def undo(self) -> bool:
+        if not self.history:
+            self.status_message = "Nothing to undo"
+            return False
+        self.state = self.history.pop()
+        self.selection = Selection()
+        if self.move_log:
+            self.move_log.pop()
+        self.status_message = "Undo"
+        return True
+
+    def save(self, path: Path = STATE_SAVE_PATH) -> None:
+        path.write_text(json.dumps(self.state.serialize(), indent=2), encoding="utf-8")
+        self.status_message = f"Saved {path}"
+
+    def load(self, path: Path = STATE_SAVE_PATH) -> bool:
+        if not path.exists():
+            self.status_message = f"No save file: {path}"
+            return False
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        self.state = GameState.deserialize(payload)
+        self.selection = Selection()
+        self.history.clear()
+        self.move_log.clear()
+        self.status_message = f"Loaded {path}"
+        return True
+
+
 def build_legal_action_maps(actions: list[Action]) -> LegalActionMaps:
     moves_by_from: dict[Square, dict[Square, MoveAction]] = {}
     drops_by_kind: dict[PieceKind, dict[Square, DropAction]] = {}
@@ -87,15 +152,13 @@ def run_debug_board() -> None:
         "small": pygame.font.SysFont(None, 20),
     }
 
-    state = GameState.initial()
-    selection = Selection()
-    move_log: list[str] = []
-    print(state.render_ascii())
+    session = DebugBoardSession.initial()
+    print(session.state.render_ascii())
 
     running = True
     while running:
-        action_maps = build_legal_action_maps(state.legal_actions())
-        hand_buttons = _hand_button_rects(pygame, state)
+        action_maps = build_legal_action_maps(session.state.legal_actions())
+        hand_buttons = _hand_button_rects(pygame, session.state)
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -104,30 +167,39 @@ def run_debug_board() -> None:
                 if event.key == pygame.K_ESCAPE:
                     running = False
                 elif event.key == pygame.K_r:
-                    state = GameState.initial()
-                    selection = Selection()
-                    move_log.clear()
-                    print(state.render_ascii())
+                    session.reset()
+                    print(session.state.render_ascii())
+                elif event.key == pygame.K_u:
+                    if session.undo():
+                        print(session.state.render_ascii())
+                    else:
+                        print(session.status_message)
+                elif event.key == pygame.K_s:
+                    session.save()
+                    print(session.status_message)
+                elif event.key == pygame.K_l:
+                    if session.load():
+                        print(session.state.render_ascii())
+                    else:
+                        print(session.status_message)
+                elif event.key == pygame.K_a:
+                    print(session.state.render_ascii())
             elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-                state, selection = _handle_click(
+                _handle_click(
                     pygame=pygame,
-                    state=state,
-                    selection=selection,
+                    session=session,
                     pos=event.pos,
                     action_maps=action_maps,
                     hand_buttons=hand_buttons,
-                    move_log=move_log,
                 )
 
         _draw(
             pygame=pygame,
             screen=screen,
             fonts=fonts,
-            state=state,
-            selection=selection,
-            action_maps=build_legal_action_maps(state.legal_actions()),
-            hand_buttons=_hand_button_rects(pygame, state),
-            move_log=move_log,
+            session=session,
+            action_maps=build_legal_action_maps(session.state.legal_actions()),
+            hand_buttons=_hand_button_rects(pygame, session.state),
         )
         pygame.display.flip()
         clock.tick(60)
@@ -138,62 +210,65 @@ def run_debug_board() -> None:
 def _handle_click(
     *,
     pygame,
-    state: GameState,
-    selection: Selection,
+    session: DebugBoardSession,
     pos: tuple[int, int],
     action_maps: LegalActionMaps,
     hand_buttons,
-    move_log: list[str],
-) -> tuple[GameState, Selection]:
+):
+    state = session.state
+    selection = session.selection
     if state.is_terminal():
-        return state, Selection()
+        session.selection = Selection()
+        return
 
     clicked_square = _square_from_pos(pos)
     if selection.square is not None and clicked_square is not None:
         action = action_maps.moves_by_from.get(selection.square, {}).get(clicked_square)
         if action is not None:
-            return _apply_debug_action(state, action, move_log), Selection()
+            _apply_debug_action(session, action)
+            return
 
     if selection.drop_kind is not None and clicked_square is not None:
         action = action_maps.drops_by_kind.get(selection.drop_kind, {}).get(clicked_square)
         if action is not None:
-            return _apply_debug_action(state, action, move_log), Selection()
+            _apply_debug_action(session, action)
+            return
 
     for player, kind, rect in hand_buttons:
         if rect.collidepoint(pos):
             if player is state.side_to_move and kind in action_maps.drops_by_kind:
-                return state, Selection(drop_kind=kind)
-            return state, Selection()
+                session.selection = Selection(drop_kind=kind)
+                return
+            session.selection = Selection()
+            return
 
     if clicked_square is not None:
         piece = state.board.get(clicked_square)
         if piece is not None and clicked_square in action_maps.moves_by_from:
-            return state, Selection(square=clicked_square)
+            session.selection = Selection(square=clicked_square)
+            return
 
-    return state, Selection()
+    session.selection = Selection()
 
 
-def _apply_debug_action(state: GameState, action: Action, move_log: list[str]) -> GameState:
-    next_state = state.apply_action(action)
-    move_log.append(_format_action(action))
-    if len(move_log) > 8:
-        del move_log[:-8]
+def _apply_debug_action(session: DebugBoardSession, action: Action) -> None:
+    session.apply_action(action)
     print()
     print(_format_action(action))
-    print(next_state.render_ascii())
-    return next_state
+    print(session.state.render_ascii())
 
 
-def _draw(*, pygame, screen, fonts, state, selection, action_maps, hand_buttons, move_log) -> None:
+def _draw(*, pygame, screen, fonts, session, action_maps, hand_buttons) -> None:
     screen.fill(BACKGROUND)
-    _draw_header(screen, fonts, state)
-    _draw_board(pygame, screen, fonts, state, selection, action_maps)
-    _draw_hands(pygame, screen, fonts, state, hand_buttons, selection)
+    _draw_header(screen, fonts, session)
+    _draw_board(pygame, screen, fonts, session.state, session.selection, action_maps)
+    _draw_hands(pygame, screen, fonts, session.state, hand_buttons, session.selection)
     _draw_help(screen, fonts)
-    _draw_move_log(screen, fonts, move_log)
+    _draw_move_log(screen, fonts, session.move_log)
 
 
-def _draw_header(screen, fonts, state: GameState) -> None:
+def _draw_header(screen, fonts, session: DebugBoardSession) -> None:
+    state = session.state
     title = fonts["title"].render("Animal Shogi Debug Board", True, TEXT)
     screen.blit(title, (24, 20))
     turn = fonts["body"].render(f"Turn: {state.side_to_move.value}", True, TEXT)
@@ -204,6 +279,9 @@ def _draw_header(screen, fonts, state: GameState) -> None:
         label = f"Terminal: {terminal.reason.value} winner={winner}"
         rendered = fonts["body"].render(label, True, TERMINAL)
         screen.blit(rendered, (220, 58))
+    if session.status_message:
+        rendered = fonts["small"].render(session.status_message, True, MUTED_TEXT)
+        screen.blit(rendered, (24, 84))
 
 
 def _draw_board(pygame, screen, fonts, state, selection, action_maps) -> None:
@@ -263,6 +341,9 @@ def _draw_help(screen, fonts) -> None:
         "Click own piece: highlight moves",
         "Click hand piece: highlight drops",
         "R: reset",
+        "U: undo",
+        "S/L: save/load JSON",
+        "A: print ASCII",
         "Esc: quit",
     ]
     for index, line in enumerate(lines):
@@ -328,4 +409,4 @@ def _format_action(action: Action) -> str:
     return f"drop {PIECE_LABELS[action.piece_kind]}*{action.to_square.file},{action.to_square.rank}"
 
 
-__all__ = ["build_legal_action_maps", "run_debug_board"]
+__all__ = ["DebugBoardSession", "build_legal_action_maps", "run_debug_board"]

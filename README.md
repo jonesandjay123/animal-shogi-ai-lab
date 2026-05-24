@@ -70,6 +70,10 @@ Controls:
 - Click one of the side-to-move's board pieces to highlight legal moves.
 - Click one of the side-to-move's hand pieces to highlight legal drops.
 - Press `R` to reset.
+- Press `U` to undo one action.
+- Press `S` to save the current state to `debug_board_state.json`.
+- Press `L` to load `debug_board_state.json`.
+- Press `A` to print the ASCII board to the terminal.
 - Press `Esc` or close the window to quit.
 
 Each successful action also prints `GameState.render_ascii()` to the terminal.
