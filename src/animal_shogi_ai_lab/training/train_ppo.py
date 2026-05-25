@@ -21,12 +21,19 @@ def train_ppo(timesteps: int = 1000) -> None:
 
     env = AnimalShogiEnv()
 
+    tb_log = None
+    try:
+        import tensorboard  # noqa: F401
+        tb_log = "runs/ppo_animal_shogi_tensorboard"
+    except ImportError:
+        print("TensorBoard is not installed. TensorBoard logging will be disabled.")
+
     # Use a simple MLP policy since the observation is flattened
     model = PPO(
         "MlpPolicy",
         env,
         verbose=1,
-        tensorboard_log="runs/ppo_animal_shogi_tensorboard",
+        tensorboard_log=tb_log,
     )
 
     print(f"Starting PPO training for {timesteps} timesteps...")

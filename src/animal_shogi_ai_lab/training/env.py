@@ -120,6 +120,10 @@ class AnimalShogiEnv(gym.Env):
 
         return obs, reward, terminated, truncated, info
 
+    def action_masks(self) -> np.ndarray:
+        """Returns the legal action mask for the current state."""
+        return legal_action_mask(self.state)
+
     def render(self) -> str | None:
         ascii_board = self.state.render_ascii()
         if self.render_mode == "human":

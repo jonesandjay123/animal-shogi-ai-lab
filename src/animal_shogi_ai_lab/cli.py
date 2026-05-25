@@ -48,3 +48,37 @@ def train_ppo_cmd(timesteps: int = typer.Option(1000, help="Number of training t
 
     train_ppo(timesteps)
 
+
+@app.command("train-maskable-ppo")
+def train_maskable_ppo_cmd(
+    timesteps: int = typer.Option(100000, help="Number of training timesteps"),
+    n_envs: int = typer.Option(8, help="Number of parallel environments"),
+    seed: int = typer.Option(0, help="Random seed for environments and models"),
+) -> None:
+    """Train a MaskablePPO model with action masking on the environment."""
+    from animal_shogi_ai_lab.training import train_maskable_ppo
+
+    train_maskable_ppo(timesteps=timesteps, n_envs=n_envs, seed=seed)
+
+
+@app.command("evaluate-random")
+def evaluate_random_cmd(
+    games: int = typer.Option(100, help="Number of games to evaluate")
+) -> None:
+    """Run a baseline evaluation of RandomAgent vs RandomAgent."""
+    from animal_shogi_ai_lab.eval import evaluate_random
+
+    evaluate_random(games)
+
+
+@app.command("evaluate-model")
+def evaluate_model_cmd(
+    model: str = typer.Option(..., help="Path to the saved model zip file"),
+    games: int = typer.Option(100, help="Number of games to evaluate"),
+) -> None:
+    """Evaluate a trained MaskablePPO model against RandomAgent."""
+    from animal_shogi_ai_lab.eval import evaluate_model
+
+    evaluate_model(model, games)
+
+

@@ -28,7 +28,9 @@ ui = [
 ]
 rl = [
   "torch>=2.3",
-  "gymnasium>=0.29"
+  "gymnasium>=0.29",
+  "stable-baselines3>=2.8.0",
+  "sb3-contrib>=2.8.0"
 ]
 
 [project.scripts]

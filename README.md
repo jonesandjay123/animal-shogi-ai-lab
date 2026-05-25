@@ -83,11 +83,51 @@ Controls:
 
 Each successful action also prints `GameState.render_ascii()` to the terminal.
 
+## Reinforcement Learning & Training
+
+This repository supports reinforcement learning training using stable-baselines3 and sb3-contrib (MaskablePPO).
+
+### Installation
+
+Install the reinforcement learning extra dependencies:
+```bash
+source .venv/bin/activate
+pip install -e ".[dev,ui,rl]"
+```
+
+### Training
+
+1. **PPO Smoke Test (Baseline)**:
+   A lightweight PPO agent training script that does not use action masking (mostly used for pipeline sanity checks).
+   ```bash
+   animal-shogi-lab train-ppo --timesteps 1000
+   ```
+
+2. **Maskable PPO (Recommended)**:
+   A PPO agent that leverages action masks to restrict predictions to legal actions.
+   ```bash
+   animal-shogi-lab train-maskable-ppo --timesteps 100000 --n-envs 8 --seed 0
+   ```
+   *Note: Animal Shogi's environment stepping is CPU-bound. Adjusting `--n-envs` allows parallel execution to maximize CPU utilization, which is key to feed the GPU efficiently.*
+
+Training runs save checkpoints, log config parameters, and store tensorboard runs under the ignored `checkpoints/` and `runs/` directories.
+
+### Evaluation
+
+1. **Random vs Random Baseline**:
+   ```bash
+   animal-shogi-lab evaluate-random --games 100
+   ```
+
+2. **Model vs Random Agent**:
+   Evaluates a trained model against a random agent, alternating Black/White roles.
+   ```bash
+   animal-shogi-lab evaluate-model --model checkpoints/animal_shogi_maskable_ppo/maskable_ppo_xxxxxx/final_model.zip --games 100
+   ```
+
 ## Current Status
 
-Clean rules engine MVP is implemented and covered by focused tests. The Pygame
-debug board is intentionally a lightweight engine validation tool, not a
-polished UI.
+Clean rules engine MVP, agents, Gymnasium adapters, and MaskablePPO training pipelines are fully implemented and verified by tests.
 
 ## Handoff Notes
 
@@ -100,3 +140,4 @@ Recommended phase order:
 3. Clean engine implementation.
 4. Baseline agents and evaluation.
 5. RL training.
+

@@ -153,3 +153,44 @@ def test_gym_env_invalid_action() -> None:
     assert reward == -10.0
     assert terminated is True
     assert next_info["error"] == "illegal_action"
+
+
+def test_env_action_masks() -> None:
+    env = AnimalShogiEnv()
+    env.reset()
+    mask = env.action_masks()
+    assert mask.shape == (132,)
+    assert mask.dtype == np.bool_
+    assert np.array_equal(mask, legal_action_mask(env.state))
+
+
+def test_train_maskable_ppo_missing_dependency(capsys) -> None:
+    import sys
+    from unittest import mock
+
+    from animal_shogi_ai_lab.training import train_maskable_ppo
+
+    with mock.patch.dict(sys.modules, {"sb3_contrib": None}):
+        train_maskable_ppo(timesteps=10)
+        captured = capsys.readouterr()
+        assert "stable-baselines3 and sb3-contrib are required" in captured.out
+
+
+def test_evaluate_model_missing_dependency(capsys) -> None:
+    import sys
+    from unittest import mock
+
+    from animal_shogi_ai_lab.eval import evaluate_model
+
+    with mock.patch.dict(sys.modules, {"sb3_contrib": None}):
+        res = evaluate_model("dummy_path", games=10)
+        captured = capsys.readouterr()
+        assert res is None
+        assert "stable-baselines3 and sb3-contrib are required" in captured.out
+
+
+def test_evaluate_random_smoke() -> None:
+    from animal_shogi_ai_lab.eval import evaluate_random
+    # Just run a quick evaluation to ensure it doesn't crash
+    evaluate_random(games=2)
+
