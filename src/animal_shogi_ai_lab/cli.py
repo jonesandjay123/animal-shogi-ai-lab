@@ -25,3 +25,26 @@ def debug_board() -> None:
     from animal_shogi_ai_lab.debug_ui.pygame_board import run_debug_board
 
     run_debug_board()
+
+
+@app.command("self-play-random")
+def self_play_random(games: int = typer.Option(100, help="Number of games to play")) -> None:
+    """Run automated self-play using random agents."""
+    from animal_shogi_ai_lab.agents import run_random_self_play
+
+    typer.echo(f"Running {games} random self-play games...")
+    stats = run_random_self_play(games)
+    typer.echo("Results:")
+    typer.echo(f"  Black wins: {stats['black_wins']}")
+    typer.echo(f"  White wins: {stats['white_wins']}")
+    typer.echo(f"  Draws: {stats['draws']}")
+    typer.echo(f"  Average length: {stats['average_length']:.2f} plies")
+
+
+@app.command("train-ppo")
+def train_ppo_cmd(timesteps: int = typer.Option(1000, help="Number of training timesteps")) -> None:
+    """Train a PPO model on the environment."""
+    from animal_shogi_ai_lab.training import train_ppo
+
+    train_ppo(timesteps)
+

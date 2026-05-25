@@ -1,0 +1,155 @@
+from __future__ import annotations
+
+import numpy as np
+
+from animal_shogi_ai_lab.agents import RandomAgent, run_random_self_play
+from animal_shogi_ai_lab.engine import (
+    DropAction,
+    GameState,
+    MoveAction,
+    Piece,
+    PieceKind,
+    Player,
+    Square,
+)
+from animal_shogi_ai_lab.training import (
+    AnimalShogiEnv,
+    decode_action,
+    encode_action,
+    encode_observation,
+    legal_action_mask,
+)
+
+
+def test_random_agent_selects_legal_actions() -> None:
+    agent = RandomAgent()
+    state = GameState.initial()
+    legal = state.legal_actions()
+    action = agent.select_action(state, legal)
+    assert action in legal
+
+
+def test_self_play_runs_successfully() -> None:
+    stats = run_random_self_play(num_games=5)
+    assert stats["games"] == 5
+    assert stats["black_wins"] + stats["white_wins"] + stats["draws"] == 5
+    assert stats["average_length"] >= 0.0
+
+
+def test_action_encoding_round_trip() -> None:
+    state = GameState.initial()
+    for action in state.legal_actions():
+        encoded = encode_action(action)
+        assert 0 <= encoded < 132
+        decoded = decode_action(encoded)
+        assert decoded == action
+
+
+def test_all_possible_decodings_and_encodings() -> None:
+    # Test all 132 slots are decodable and can be encoded back
+    # if they are syntactically valid moves/drops
+    for i in range(132):
+        action = decode_action(i)
+        if isinstance(action, MoveAction):
+            assert 0 <= action.from_square.file < 3
+            assert 0 <= action.from_square.rank < 4
+            assert encode_action(action) == i
+        elif isinstance(action, DropAction):
+            assert 0 <= action.to_square.file < 3
+            assert 0 <= action.to_square.rank < 4
+            assert action.piece_kind in [PieceKind.CHICK, PieceKind.GIRAFFE, PieceKind.ELEPHANT]
+            assert encode_action(action) == i
+
+
+def test_legal_action_mask() -> None:
+    state = GameState.initial()
+    mask = legal_action_mask(state)
+    assert mask.shape == (132,)
+    assert mask.dtype == np.bool_
+
+    legal_indices = [encode_action(act) for act in state.legal_actions()]
+    for i in range(132):
+        if i in legal_indices:
+            assert mask[i]
+        else:
+            assert not mask[i]
+
+
+def test_legal_action_mask_terminal() -> None:
+    # Create a simple terminal state by capturing the opponent Lion
+    board = {
+        Square(1, 1): Piece(Player.BLACK, PieceKind.LION),
+        Square(1, 2): Piece(Player.WHITE, PieceKind.LION),
+    }
+    state = GameState.from_parts(board=board, side_to_move=Player.BLACK)
+    terminal_state = state.apply_action(MoveAction(Square(1, 1), Square(1, 2)))
+    assert terminal_state.is_terminal()
+
+    mask = legal_action_mask(terminal_state)
+    assert not np.any(mask)  # All False
+
+
+def test_observation_encoding() -> None:
+    state = GameState.initial()
+    obs = encode_observation(state)
+    assert obs.shape == (126,)
+    assert obs.dtype == np.float32
+
+    # Reconstruction check
+    planes = obs[:120].reshape((10, 4, 3))
+    assert planes[0, 0, 1] == 1.0  # own Lion at (1, 0)
+    assert planes[1, 0, 2] == 1.0  # own Giraffe at (2, 0)
+    assert planes[2, 0, 0] == 1.0  # own Elephant at (0, 0)
+    assert planes[3, 1, 1] == 1.0  # own Chick at (1, 1)
+
+    assert planes[5, 3, 1] == 1.0  # opponent Lion at (1, 3)
+    assert planes[6, 3, 0] == 1.0  # opponent Giraffe at (0, 3)
+    assert planes[7, 3, 2] == 1.0  # opponent Elephant at (2, 3)
+    assert planes[8, 2, 1] == 1.0  # opponent Chick at (1, 2)
+
+    assert np.all(obs[120:] == 0.0)  # no hand counts initially
+
+
+def test_observation_perspective_normalization() -> None:
+    board = {Square(0, 0): Piece(Player.BLACK, PieceKind.LION)}
+
+    state_black = GameState.from_parts(board=board, side_to_move=Player.BLACK)
+    obs_black = encode_observation(state_black)[:120].reshape((10, 4, 3))
+    assert obs_black[0, 0, 0] == 1.0  # own Lion at (0, 0)
+
+    state_white = GameState.from_parts(board=board, side_to_move=Player.WHITE)
+    obs_white = encode_observation(state_white)[:120].reshape((10, 4, 3))
+    assert obs_white[5, 3, 2] == 1.0  # opponent Lion at (2, 3) (flipped)
+
+
+def test_gym_env_flow() -> None:
+    env = AnimalShogiEnv()
+    obs, info = env.reset()
+    assert obs.shape == (126,)
+    assert "action_mask" in info
+    assert info["action_mask"].shape == (132,)
+
+    legal_indices = np.where(info["action_mask"])[0]
+    assert len(legal_indices) > 0
+    action_idx = legal_indices[0]
+
+    next_obs, reward, terminated, truncated, next_info = env.step(action_idx)
+    assert next_obs.shape == (126,)
+    assert isinstance(reward, float)
+    assert isinstance(terminated, bool)
+    assert isinstance(truncated, bool)
+    assert "action_mask" in next_info
+
+
+def test_gym_env_invalid_action() -> None:
+    env = AnimalShogiEnv()
+    obs, info = env.reset()
+
+    invalid_indices = np.where(~info["action_mask"])[0]
+    assert len(invalid_indices) > 0
+    action_idx = invalid_indices[0]
+
+    next_obs, reward, terminated, truncated, next_info = env.step(action_idx)
+    assert reward == -10.0
+    assert terminated is True
+    assert next_info["error"] == "illegal_action"
