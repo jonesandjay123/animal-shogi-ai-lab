@@ -74,15 +74,30 @@ def evaluate_random_cmd(
     evaluate_random(games)
 
 
+@app.command("train-maskable-ppo-vs-random")
+def train_maskable_ppo_vs_random_cmd(
+    side: str = typer.Option("BLACK", help="The side PPO will control: BLACK or WHITE"),
+    timesteps: int = typer.Option(100000, help="Number of training timesteps"),
+    n_envs: int = typer.Option(8, help="Number of parallel environments"),
+    seed: int = typer.Option(0, help="Random seed for environments and models"),
+) -> None:
+    """Train a MaskablePPO agent against a random opponent."""
+    from animal_shogi_ai_lab.training import train_maskable_ppo_vs_random
+
+    train_maskable_ppo_vs_random(side=side, timesteps=timesteps, n_envs=n_envs, seed=seed)
+
+
 @app.command("evaluate-model")
 def evaluate_model_cmd(
     model: str = typer.Option(..., help="Path to the saved model zip file"),
     games: int = typer.Option(100, help="Number of games to evaluate"),
+    side: str = typer.Option("BOTH", help="Model side to evaluate: BLACK, WHITE, or BOTH"),
+    opponent: str = typer.Option("random", help="Opponent type to evaluate against"),
 ) -> None:
     """Evaluate a trained MaskablePPO model against RandomAgent."""
     from animal_shogi_ai_lab.eval import evaluate_model
 
-    evaluate_model(model, games)
+    evaluate_model(model, games, side=side, opponent_type=opponent)
 
 
 @app.command("play-vs-model")

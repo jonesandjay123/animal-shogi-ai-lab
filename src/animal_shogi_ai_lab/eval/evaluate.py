@@ -24,10 +24,15 @@ def evaluate_random(games: int = 100) -> None:
     print(f"  Average Game Length: {stats['average_length']:.2f} plies")
 
 
-def evaluate_model(model_path: str, games: int = 100) -> dict[str, Any] | None:
+def evaluate_model(
+    model_path: str,
+    games: int = 100,
+    side: str = "BOTH",
+    opponent_type: str = "random",
+) -> dict[str, Any] | None:
     """Evaluates a trained MaskablePPO model against a RandomAgent.
 
-    Alternates player roles (Model as Black, then Model as White) for fair evaluation.
+    Supports evaluating strictly as BLACK, WHITE, or alternating BOTH sides.
     """
     try:
         from sb3_contrib import MaskablePPO
@@ -50,11 +55,17 @@ def evaluate_model(model_path: str, games: int = 100) -> dict[str, Any] | None:
     invalid_actions = 0
     total_ply = 0
 
-    print(f"Starting evaluation of {games} games against RandomAgent...")
+    eval_side = side.upper()
+    print(f"Starting evaluation of {games} games against RandomAgent (Model Side: {eval_side})...")
 
     for i in range(games):
-        # Alternate roles: Model is BLACK on even games, WHITE on odd games.
-        model_player = Player.BLACK if i % 2 == 0 else Player.WHITE
+        # Choose side
+        if eval_side == "BLACK":
+            model_player = Player.BLACK
+        elif eval_side == "WHITE":
+            model_player = Player.WHITE
+        else:
+            model_player = Player.BLACK if i % 2 == 0 else Player.WHITE
 
         state = GameState.initial()
         while not state.is_terminal():
@@ -109,7 +120,7 @@ def evaluate_model(model_path: str, games: int = 100) -> dict[str, Any] | None:
 
     print("\nResults:")
     print(f"  Total Games: {games}")
-    print(f"  Model Wins: {model_wins} (as Black: {model_wins if games % 2 == 0 else 'N/A'})")
+    print(f"  Model Wins: {model_wins}")
     print(f"  Random Agent Wins: {random_wins}")
     print(f"  Draws: {draws}")
     print(f"  Model Win Rate: {win_rate * 100:.2f}%")

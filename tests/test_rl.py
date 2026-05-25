@@ -207,3 +207,54 @@ def test_play_vs_model_missing_dependency(capsys) -> None:
         assert "stable-baselines3 and sb3-contrib are required" in captured.out
 
 
+def test_vs_opponent_env_reset() -> None:
+    from animal_shogi_ai_lab.training.env_vs_opponent import AnimalShogiVsOpponentEnv
+    # BLACK reset: starts immediately on BLACK's turn
+    env_black = AnimalShogiVsOpponentEnv(learning_player=Player.BLACK)
+    obs, info = env_black.reset()
+    assert env_black.state.side_to_move == Player.BLACK
+    assert env_black.state.ply == 0
+
+    # WHITE reset: opponent plays BLACK's move automatically, transitioning to WHITE's turn
+    env_white = AnimalShogiVsOpponentEnv(learning_player=Player.WHITE)
+    obs, info = env_white.reset()
+    assert env_white.state.side_to_move == Player.WHITE
+    assert env_white.state.ply == 1
+
+
+def test_vs_opponent_env_step_advances_two_plies() -> None:
+    from animal_shogi_ai_lab.training.env_vs_opponent import AnimalShogiVsOpponentEnv
+    env = AnimalShogiVsOpponentEnv(learning_player=Player.BLACK)
+    obs, info = env.reset()
+    assert env.state.side_to_move == Player.BLACK
+
+    # Execute a move
+    legal_indices = np.where(info["action_mask"])[0]
+    action_idx = legal_indices[0]
+
+    obs_next, reward, terminated, truncated, info_next = env.step(action_idx)
+
+    # Game should either be terminal or back to BLACK's turn (since White opponent responded)
+    if not terminated:
+        assert env.state.side_to_move == Player.BLACK
+        assert env.state.ply == 2
+        assert reward == -0.001
+    else:
+        assert reward in [1.0, -1.0, 0.0]
+
+
+def test_train_maskable_ppo_vs_random_missing_dependency(capsys) -> None:
+    import sys
+    from unittest import mock
+
+    from animal_shogi_ai_lab.training.train_maskable_ppo_vs_random import (
+        train_maskable_ppo_vs_random,
+    )
+
+    with mock.patch.dict(sys.modules, {"sb3_contrib": None}):
+        train_maskable_ppo_vs_random(side="BLACK", timesteps=10)
+        captured = capsys.readouterr()
+        assert "stable-baselines3 and sb3-contrib are required" in captured.out
+
+
+
