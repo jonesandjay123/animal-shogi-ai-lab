@@ -161,13 +161,32 @@ def _get_scale_info(window_size: tuple[int, int]) -> tuple[int, int, int, int]:
     return new_w, new_h, offset_x, offset_y
 
 
-def run_debug_board() -> None:
+def run_debug_board(model_path: str | None = None, ai_side: str = "WHITE") -> None:
     try:
         import pygame
     except ModuleNotFoundError as exc:
         raise RuntimeError(
             "Pygame is not installed. Run `pip install -e \".[dev,ui]\"` first."
         ) from exc
+
+    # Load PPO Model if requested
+    model = None
+    if model_path:
+        try:
+            from sb3_contrib import MaskablePPO
+            print(f"Loading AI model from {model_path}...")
+            model = MaskablePPO.load(model_path)
+            print("Model loaded successfully.")
+        except ImportError:
+            print(
+                "Warning: stable-baselines3 or sb3-contrib not installed. "
+                "Running in human self-play mode."
+            )
+        except Exception as e:
+            print(
+                f"Warning: Failed to load model: {e}. "
+                "Running in human self-play mode."
+            )
 
     pygame.init()
     screen = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT), pygame.RESIZABLE)
@@ -190,6 +209,49 @@ def run_debug_board() -> None:
 
     running = True
     while running:
+        # Check if AI should take a turn
+        if model is not None and not session.state.is_terminal():
+            current_side = session.state.side_to_move.value  # "BLACK" or "WHITE"
+            is_ai_turn = False
+            if ai_side == "BOTH":
+                is_ai_turn = True
+            elif ai_side == "BLACK" and current_side == "BLACK":
+                is_ai_turn = True
+            elif ai_side == "WHITE" and current_side == "WHITE":
+                is_ai_turn = True
+
+            if is_ai_turn:
+                # Pre-draw to show the human's last move
+                _draw(
+                    pygame=pygame,
+                    screen=canvas,
+                    fonts=fonts,
+                    session=session,
+                    action_maps=build_legal_action_maps(session.state.legal_actions()),
+                    hand_buttons=_hand_button_rects(pygame, session.state),
+                    sprites=sprites,
+                )
+                screen.fill((0, 0, 0))
+                new_w, new_h, offset_x, offset_y = _get_scale_info(screen.get_size())
+                if new_w > 0 and new_h > 0:
+                    scaled_canvas = pygame.transform.smoothscale(canvas, (new_w, new_h))
+                    screen.blit(scaled_canvas, (offset_x, offset_y))
+                pygame.display.flip()
+
+                # Natural delay to simulate thinking (300ms)
+                pygame.time.wait(300)
+
+                from animal_shogi_ai_lab.training import (
+                    decode_action,
+                    encode_observation,
+                    legal_action_mask,
+                )
+                obs = encode_observation(session.state)
+                mask = legal_action_mask(session.state)
+                action_idx, _ = model.predict(obs, action_masks=mask, deterministic=True)
+                action = decode_action(int(action_idx))
+                _apply_debug_action(session, action)
+
         action_maps = build_legal_action_maps(session.state.legal_actions())
         hand_buttons = _hand_button_rects(pygame, session.state)
 

@@ -20,11 +20,14 @@ def status() -> None:
 
 
 @app.command("debug-board")
-def debug_board() -> None:
-    """Launch the Pygame human self-play debug board."""
+def debug_board(
+    model: str = typer.Option(None, help="Path to the trained PPO model zip file"),
+    ai_side: str = typer.Option("WHITE", help="AI side: BLACK, WHITE, or BOTH"),
+) -> None:
+    """Launch the Pygame debug board (supports playing against a trained model)."""
     from animal_shogi_ai_lab.debug_ui.pygame_board import run_debug_board
 
-    run_debug_board()
+    run_debug_board(model_path=model, ai_side=ai_side)
 
 
 @app.command("self-play-random")
@@ -80,5 +83,17 @@ def evaluate_model_cmd(
     from animal_shogi_ai_lab.eval import evaluate_model
 
     evaluate_model(model, games)
+
+
+@app.command("play-vs-model")
+def play_vs_model_cmd(
+    model: str = typer.Option(..., help="Path to the trained PPO model zip file"),
+    side: str = typer.Option("BLACK", help="Side you want to play: BLACK or WHITE"),
+) -> None:
+    """Start an interactive terminal-based game against a trained PPO model."""
+    from animal_shogi_ai_lab.eval import play_vs_model
+
+    play_vs_model(model_path=model, human_side=side)
+
 
 

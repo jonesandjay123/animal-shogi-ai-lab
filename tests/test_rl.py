@@ -194,3 +194,16 @@ def test_evaluate_random_smoke() -> None:
     # Just run a quick evaluation to ensure it doesn't crash
     evaluate_random(games=2)
 
+
+def test_play_vs_model_missing_dependency(capsys) -> None:
+    import sys
+    from unittest import mock
+
+    from animal_shogi_ai_lab.eval import play_vs_model
+
+    with mock.patch.dict(sys.modules, {"sb3_contrib": None}):
+        play_vs_model("dummy_path", human_side="BLACK")
+        captured = capsys.readouterr()
+        assert "stable-baselines3 and sb3-contrib are required" in captured.out
+
+
