@@ -54,3 +54,30 @@ graph TD
    - PPO loses: `-1.0`
    - Draw: `0.0`
    - Step penalty: `-0.001`
+
+## Phase 9C: PPO vs Heuristic Opponent
+
+The next practical training target is `train-maskable-ppo-vs-heuristic`.
+It keeps the single-side `AnimalShogiVsOpponentEnv` structure but replaces the random
+opponent with a deterministic one-ply heuristic policy plus random tie-breaking.
+
+The heuristic opponent:
+
+- prefers immediate winning moves, especially Lion capture;
+- avoids moves that allow its own Lion to be captured next turn when alternatives exist;
+- values captures, Chick promotion, material, and small positional advancement;
+- still chooses only from `GameState.legal_actions()`.
+
+This version is intentionally conservative. It does not add complex reward shaping yet;
+the important architectural fix is that PPO controls only one side while a separate
+opponent controls the other side. For Mac Air training, start with a smoke run before
+launching a longer job:
+
+```bash
+animal-shogi-lab train-maskable-ppo-vs-heuristic \
+  --side BLACK \
+  --timesteps 10000 \
+  --n-envs 4 \
+  --seed 0 \
+  --step-penalty -0.0001
+```

@@ -30,12 +30,14 @@ class AnimalShogiVsOpponentEnv(gym.Env):
         opponent: Any = None,
         render_mode: str | None = None,
         max_steps: int = 200,
+        step_penalty: float = -0.001,
     ) -> None:
         super().__init__()
         self.learning_player = learning_player
         self.opponent = opponent or RandomAgent()
         self.render_mode = render_mode
         self.max_steps = max_steps
+        self.step_penalty = step_penalty
         self.state = GameState.initial()
 
         self.action_space = spaces.Discrete(132)
@@ -117,7 +119,7 @@ class AnimalShogiVsOpponentEnv(gym.Env):
                 else:
                     reward = -1.0
         else:
-            reward = -0.001  # Small step penalty
+            reward = self.step_penalty
 
         truncated = False
         if not terminated and self.state.ply >= self.max_steps:

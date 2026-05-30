@@ -110,6 +110,18 @@ pip install -e ".[dev,ui,rl]"
    ```
    *Note: Animal Shogi's environment stepping is CPU-bound. Adjusting `--n-envs` allows parallel execution to maximize CPU utilization, which is key to feed the GPU efficiently.*
 
+3. **Maskable PPO vs Heuristic Opponent (Current recommended next run)**:
+   A single-side PPO agent trained against a fixed one-ply heuristic opponent. This avoids
+   the earlier single-policy self-play failure mode where one policy controlled both sides.
+   ```bash
+   animal-shogi-lab train-maskable-ppo-vs-heuristic \
+     --side BLACK \
+     --timesteps 1000000 \
+     --n-envs 4 \
+     --seed 0 \
+     --step-penalty -0.0001
+   ```
+
 Training runs save checkpoints, log config parameters, and store tensorboard runs under the ignored `checkpoints/` and `runs/` directories.
 
 ### Evaluation
@@ -140,4 +152,3 @@ Recommended phase order:
 3. Clean engine implementation.
 4. Baseline agents and evaluation.
 5. RL training.
-

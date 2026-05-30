@@ -87,6 +87,26 @@ def train_maskable_ppo_vs_random_cmd(
     train_maskable_ppo_vs_random(side=side, timesteps=timesteps, n_envs=n_envs, seed=seed)
 
 
+@app.command("train-maskable-ppo-vs-heuristic")
+def train_maskable_ppo_vs_heuristic_cmd(
+    side: str = typer.Option("BLACK", help="The side PPO will control: BLACK or WHITE"),
+    timesteps: int = typer.Option(1000000, help="Number of training timesteps"),
+    n_envs: int = typer.Option(4, help="Number of parallel environments"),
+    seed: int = typer.Option(0, help="Random seed for environments and models"),
+    step_penalty: float = typer.Option(-0.0001, help="Non-terminal step penalty"),
+) -> None:
+    """Train a MaskablePPO agent against a heuristic opponent."""
+    from animal_shogi_ai_lab.training import train_maskable_ppo_vs_heuristic
+
+    train_maskable_ppo_vs_heuristic(
+        side=side,
+        timesteps=timesteps,
+        n_envs=n_envs,
+        seed=seed,
+        step_penalty=step_penalty,
+    )
+
+
 @app.command("evaluate-model")
 def evaluate_model_cmd(
     model: str = typer.Option(..., help="Path to the saved model zip file"),
@@ -109,6 +129,5 @@ def play_vs_model_cmd(
     from animal_shogi_ai_lab.eval import play_vs_model
 
     play_vs_model(model_path=model, human_side=side)
-
 
 

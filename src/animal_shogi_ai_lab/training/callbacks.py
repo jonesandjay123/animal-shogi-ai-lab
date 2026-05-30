@@ -24,10 +24,11 @@ class ProgressEstimatorCallback(BaseCallback):
 
     def _on_step(self) -> bool:
         current_step = self.num_timesteps
-        if (
-            current_step - self.last_log_step >= self.log_interval
-            or current_step >= self.total_timesteps
-        ):
+        if self.last_log_step >= self.total_timesteps:
+            return True
+        reached_interval = current_step - self.last_log_step >= self.log_interval
+        reached_total = current_step >= self.total_timesteps > self.last_log_step
+        if reached_interval or reached_total:
             self.last_log_step = current_step
             elapsed = time.time() - self.start_time
             percentage = (current_step / self.total_timesteps) * 100

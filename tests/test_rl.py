@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from animal_shogi_ai_lab.agents import RandomAgent, run_random_self_play
+from animal_shogi_ai_lab.agents import HeuristicAgent, RandomAgent, run_random_self_play
 from animal_shogi_ai_lab.engine import (
     DropAction,
     GameState,
@@ -27,6 +27,26 @@ def test_random_agent_selects_legal_actions() -> None:
     legal = state.legal_actions()
     action = agent.select_action(state, legal)
     assert action in legal
+
+
+def test_heuristic_agent_selects_legal_actions() -> None:
+    agent = HeuristicAgent()
+    state = GameState.initial()
+    legal = state.legal_actions()
+    action = agent.select_action(state, legal)
+    assert action in legal
+
+
+def test_heuristic_agent_prefers_immediate_lion_capture() -> None:
+    agent = HeuristicAgent()
+    board = {
+        Square(1, 1): Piece(Player.BLACK, PieceKind.LION),
+        Square(1, 2): Piece(Player.WHITE, PieceKind.LION),
+        Square(0, 0): Piece(Player.BLACK, PieceKind.ELEPHANT),
+    }
+    state = GameState.from_parts(board=board, side_to_move=Player.BLACK)
+    action = agent.select_action(state, state.legal_actions())
+    assert action == MoveAction(Square(1, 1), Square(1, 2))
 
 
 def test_self_play_runs_successfully() -> None:
@@ -243,6 +263,27 @@ def test_vs_opponent_env_step_advances_two_plies() -> None:
         assert reward in [1.0, -1.0, 0.0]
 
 
+def test_vs_opponent_env_step_with_heuristic_opponent() -> None:
+    from animal_shogi_ai_lab.training.env_vs_opponent import AnimalShogiVsOpponentEnv
+
+    env = AnimalShogiVsOpponentEnv(
+        learning_player=Player.BLACK,
+        opponent=HeuristicAgent(),
+        step_penalty=-0.0001,
+    )
+    obs, info = env.reset()
+    legal_indices = np.where(info["action_mask"])[0]
+
+    obs_next, reward, terminated, truncated, info_next = env.step(legal_indices[0])
+
+    assert obs.shape == (126,)
+    assert obs_next.shape == (126,)
+    assert isinstance(reward, float)
+    assert isinstance(terminated, bool)
+    assert isinstance(truncated, bool)
+    assert "action_mask" in info_next
+
+
 def test_train_maskable_ppo_vs_random_missing_dependency(capsys) -> None:
     import sys
     from unittest import mock
@@ -256,5 +297,18 @@ def test_train_maskable_ppo_vs_random_missing_dependency(capsys) -> None:
         captured = capsys.readouterr()
         assert "stable-baselines3 and sb3-contrib are required" in captured.out
 
+
+def test_train_maskable_ppo_vs_heuristic_missing_dependency(capsys) -> None:
+    import sys
+    from unittest import mock
+
+    from animal_shogi_ai_lab.training.train_maskable_ppo_vs_heuristic import (
+        train_maskable_ppo_vs_heuristic,
+    )
+
+    with mock.patch.dict(sys.modules, {"sb3_contrib": None}):
+        train_maskable_ppo_vs_heuristic(side="BLACK", timesteps=10)
+        captured = capsys.readouterr()
+        assert "stable-baselines3 and sb3-contrib are required" in captured.out
 
 
