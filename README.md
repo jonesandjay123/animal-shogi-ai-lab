@@ -110,7 +110,7 @@ pip install -e ".[dev,ui,rl]"
    ```
    *Note: Animal Shogi's environment stepping is CPU-bound. Adjusting `--n-envs` allows parallel execution to maximize CPU utilization, which is key to feed the GPU efficiently.*
 
-3. **Maskable PPO vs Heuristic Opponent (Current recommended next run)**:
+3. **Maskable PPO vs Heuristic Opponent (Latest completed baseline)**:
    A single-side PPO agent trained against a fixed one-ply heuristic opponent. This avoids
    the earlier single-policy self-play failure mode where one policy controlled both sides.
    ```bash
@@ -123,6 +123,12 @@ pip install -e ".[dev,ui,rl]"
    ```
 
 Training runs save checkpoints, log config parameters, and store tensorboard runs under the ignored `checkpoints/` and `runs/` directories.
+
+The latest completed baseline is documented in
+[`docs/HANDOFF.md`](docs/HANDOFF.md) and
+[`docs/NEXT_TRAINING_STEPS.md`](docs/NEXT_TRAINING_STEPS.md). Do not start
+another long training run before reading those notes; the next recommended
+phase is evaluation and model inspection.
 
 ### Evaluation
 
@@ -139,16 +145,19 @@ Training runs save checkpoints, log config parameters, and store tensorboard run
 
 ## Current Status
 
-Clean rules engine MVP, agents, Gymnasium adapters, and MaskablePPO training pipelines are fully implemented and verified by tests.
+Clean rules engine MVP, agents, Gymnasium adapters, debug board, and MaskablePPO training pipelines are implemented and verified by tests. The first useful RL baseline is `v3_black_5m_vs_heuristic_baseline`.
+
+Next step: Phase 9D evaluation and model inspection. Start here:
+
+- [`docs/HANDOFF.md`](docs/HANDOFF.md) for the current repo state and latest model path.
+- [`docs/NEXT_TRAINING_STEPS.md`](docs/NEXT_TRAINING_STEPS.md) for the concrete next-agent plan.
+- [`docs/RL_TRAINING_NOTES.md`](docs/RL_TRAINING_NOTES.md) for why single-policy self-play failed and why vs-opponent training is the current direction.
+- [`docs/EXPERIMENTS.md`](docs/EXPERIMENTS.md) for recorded runs and evaluation commands.
 
 ## Handoff Notes
 
-Start with `docs/HANDOFF.md`, then `docs/RULE_RESEARCH_PROMPT.md`.
+Start with [`docs/HANDOFF.md`](docs/HANDOFF.md), then
+[`docs/NEXT_TRAINING_STEPS.md`](docs/NEXT_TRAINING_STEPS.md).
 
-Recommended phase order:
-
-1. Rule research and `docs/GAME_RULES.md` update.
-2. Legacy repo audit using `docs/LEGACY_AUDIT_PROMPT.md`.
-3. Clean engine implementation.
-4. Baseline agents and evaluation.
-5. RL training.
+The older rule research and legacy audit prompts remain in `docs/` for context,
+but they are no longer the active next step.
