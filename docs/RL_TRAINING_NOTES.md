@@ -81,3 +81,38 @@ animal-shogi-lab train-maskable-ppo-vs-heuristic \
   --seed 0 \
   --step-penalty -0.0001
 ```
+
+### Completed Baseline: `v3_black_5m_vs_heuristic_baseline`
+
+The first full Phase 9C run completed successfully:
+
+```text
+Command:
+animal-shogi-lab train-maskable-ppo-vs-heuristic \
+  --side BLACK \
+  --timesteps 5000000 \
+  --n-envs 4 \
+  --seed 0 \
+  --step-penalty -0.0001
+
+Final model:
+checkpoints/animal_shogi_maskable_ppo_vs_heuristic/maskable_ppo_vs_heuristic_black_20260530_095018/final_model.zip
+```
+
+This model should be treated as the first useful RL baseline. A 3.9M checkpoint
+smoke evaluation against random reached 72% win rate over 50 games with zero
+invalid model actions. The final 5M model still needs formal evaluation against
+both random and heuristic opponents.
+
+## Phase 9D: Evaluate Before More Training
+
+The next step is not another long run. First, evaluate and inspect the completed
+5M baseline:
+
+- add `evaluate-model --opponent heuristic`;
+- evaluate the final model as BLACK, WHITE, and BOTH;
+- compare 1M/2M/3M/4M/5M checkpoints;
+- save a few replay samples for human inspection;
+- update `docs/EXPERIMENTS.md` with results.
+
+See `docs/NEXT_TRAINING_STEPS.md` for the concrete handoff plan.

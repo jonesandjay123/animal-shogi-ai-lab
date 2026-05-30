@@ -1,5 +1,23 @@
 # Roadmap
 
+## Current Position
+
+Completed:
+
+- Rule research and authoritative rules spec.
+- Legacy audit.
+- Clean rules engine and hardening tests.
+- ASCII render and Pygame debug board.
+- Random and heuristic agents.
+- Gymnasium adapters and MaskablePPO training.
+- First useful RL baseline: `v3_black_5m_vs_heuristic_baseline`.
+
+Immediate next phase:
+
+- Phase 9D: evaluation and model inspection. See `docs/NEXT_TRAINING_STEPS.md`.
+
+Do not launch another long training run until the 5M baseline has been evaluated against random and heuristic opponents.
+
 ## Milestone 0: Scaffold
 
 - Repo layout.
@@ -37,6 +55,13 @@
 - Self-play data collection.
 - Small policy/value model.
 - Checkpointing and evaluation reports.
+
+Current RL status:
+
+- Single-policy alternating self-play is known bad because it learned collusive fast endings.
+- `AnimalShogiVsOpponentEnv` is the recommended training environment.
+- `train-maskable-ppo-vs-heuristic` produced the current baseline.
+- Next work: opponent-aware evaluation, checkpoint comparison, replay samples, and then reward shaping only if the evaluation justifies it.
 
 ## Milestone 5: UI / Demo
 

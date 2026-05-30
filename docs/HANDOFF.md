@@ -1,33 +1,82 @@
 # Handoff
 
-This repo is prepared as a scaffold for the next Codex implementation pass.
+This repo is now past scaffold, rules research, legacy audit, clean engine, UI debug board, and the first useful RL training run.
 
-## What Exists Now
+## Current Status
 
-- Python package skeleton under `src/animal_shogi_ai_lab/`.
-- Module boundaries for engine, agents, training, evaluation, and replay data.
-- Documentation for architecture, rules, roadmap, and experiment tracking.
-- Basic import tests so the scaffold can be validated immediately.
+- Rules spec: `docs/GAME_RULES.md` is the authority.
+- Engine: pure Python rules engine under `src/animal_shogi_ai_lab/engine/`.
+- Tests: focused unit coverage for engine, debug UI helpers, RL adapter, and training entry points.
+- Debug UI: Pygame board with animal sprite assets, undo, save/load, ASCII print, and optional model play.
+- Training: Gymnasium adapters and MaskablePPO entry points are implemented.
+- Latest recommended model baseline: `v3_black_5m_vs_heuristic_baseline`.
 
-## What To Build First
+## Latest RL Baseline
 
-1. Run the rule research phase from `docs/RULE_RESEARCH_PROMPT.md`.
-2. Update and review `docs/GAME_RULES.md`.
-3. Run the legacy audit phase from `docs/LEGACY_AUDIT_PROMPT.md`, if old repos are in scope.
-4. Implement the core rules engine.
-5. Add unit tests for every rule before adding learning code.
-6. Add random-agent self-play to stress-test legal move generation.
-7. Only then add heuristic/MCTS/RL agents.
+Training run:
 
-## Non-Goals For The First Pass
+```text
+Command:
+animal-shogi-lab train-maskable-ppo-vs-heuristic \
+  --side BLACK \
+  --timesteps 5000000 \
+  --n-envs 4 \
+  --seed 0 \
+  --step-penalty -0.0001
 
-- Do not start with neural network training.
-- Do not build a polished web UI before the engine is correct.
-- Do not bury game rules inside training code.
-- Do not commit large checkpoints or run artifacts.
+Checkpoint directory:
+checkpoints/animal_shogi_maskable_ppo_vs_heuristic/maskable_ppo_vs_heuristic_black_20260530_095018
 
-## Suggested First Codex Task
+Final model:
+checkpoints/animal_shogi_maskable_ppo_vs_heuristic/maskable_ppo_vs_heuristic_black_20260530_095018/final_model.zip
+```
 
-Use `docs/RULE_RESEARCH_PROMPT.md`.
+The run completed at 5,000,000 steps. A 3.9M checkpoint smoke evaluation against random produced:
 
-The first Codex task should update the rules spec and stop. It should not implement `animal_shogi_ai_lab.engine` yet.
+```text
+Games: 50
+Model side: BLACK
+Opponent: random
+Model wins: 36
+Random wins: 13
+Draws: 1
+Invalid actions: 0
+Win rate: 72.00%
+Average length: 12.26 plies
+```
+
+The human playtest impression was that the model shows visible improvement and plays around a rough beginner/intermediate debug baseline level.
+
+## What To Do Next
+
+Do **Phase 9D: Evaluation and Model Inspection** before launching another long training run.
+
+Priority order:
+
+1. Add evaluation against `HeuristicAgent`, not only `RandomAgent`.
+2. Evaluate `final_model.zip` against random and heuristic as BLACK, WHITE, and BOTH.
+3. Compare checkpoints at 1M, 2M, 3M, 4M, and 5M to detect plateau or regression.
+4. Add replay logging for selected evaluation games as JSON and/or ASCII.
+5. Improve debug-board model inspection: last AI move, terminal reason, and move log clarity.
+6. Only after inspection, decide whether Phase 9E should add reward shaping or a stronger opponent.
+
+See `docs/NEXT_TRAINING_STEPS.md` for a concrete implementation plan.
+
+## Guardrails
+
+- Do not return to single-policy self-play where one PPO controls both BLACK and WHITE.
+- Do not add complex reward shaping before measuring the current 5M baseline.
+- Do not commit generated checkpoints, `runs/`, or large training artifacts.
+- Keep rule behavior in `engine/`; UI, agents, and training code must use `GameState.legal_actions()` and `GameState.apply_action()`.
+- Preserve action-mask compatibility for MaskablePPO.
+
+## Verification Gate
+
+Before committing code changes:
+
+```bash
+source .venv/bin/activate
+python3 -m ruff check src tests
+python3 -m compileall src
+python3 -m pytest
+```
