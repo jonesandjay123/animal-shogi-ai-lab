@@ -28,10 +28,12 @@ def evaluate_model(
     games: int = 100,
     side: str = "BOTH",
     opponent_type: str = "random",
+    opponent_model_path: str | None = None,
 ) -> dict[str, Any] | None:
     """Evaluates a trained MaskablePPO model against a fixed opponent.
 
-    Supports ``opponent_type`` "random" or "heuristic", and evaluating strictly
+    Supports ``opponent_type`` "random", "heuristic", or "model" (a frozen
+    MaskablePPO loaded from ``opponent_model_path``), and evaluating strictly
     as BLACK, WHITE, or alternating BOTH sides.
     """
     try:
@@ -47,8 +49,19 @@ def evaluate_model(
         opponent = RandomAgent()
     elif opponent_name == "heuristic":
         opponent = HeuristicAgent()
+    elif opponent_name == "model":
+        if opponent_model_path is None:
+            print("opponent=model requires --opponent-model <path to model zip>.")
+            return None
+        from animal_shogi_ai_lab.agents.model_agent import ModelOpponentAgent
+
+        print(f"Loading opponent model from: {opponent_model_path}")
+        # Stochastic opponent, otherwise every deterministic-vs-deterministic
+        # game is identical and the win rate is meaningless.
+        opponent = ModelOpponentAgent(model_path=opponent_model_path, deterministic=False)
+        opponent_name = "model"
     else:
-        print(f"Unknown opponent type: {opponent_type}. Use 'random' or 'heuristic'.")
+        print(f"Unknown opponent type: {opponent_type}. Use 'random', 'heuristic', or 'model'.")
         return None
 
     print(f"Loading model from: {model_path}")

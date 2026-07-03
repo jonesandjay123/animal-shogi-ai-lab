@@ -154,12 +154,19 @@ def evaluate_model_cmd(
     model: str = typer.Option(..., help="Path to the saved model zip file"),
     games: int = typer.Option(100, help="Number of games to evaluate"),
     side: str = typer.Option("BOTH", help="Model side to evaluate: BLACK, WHITE, or BOTH"),
-    opponent: str = typer.Option("random", help="Opponent type to evaluate against"),
+    opponent: str = typer.Option("random", help="Opponent type: random, heuristic, or model"),
+    opponent_model: str = typer.Option(None, help="Opponent model zip (for opponent=model)"),
 ) -> None:
-    """Evaluate a trained MaskablePPO model against RandomAgent."""
+    """Evaluate a trained MaskablePPO model against a fixed opponent."""
     from animal_shogi_ai_lab.eval import evaluate_model
 
-    evaluate_model(model, games, side=side, opponent_type=opponent)
+    evaluate_model(
+        model,
+        games,
+        side=side,
+        opponent_type=opponent,
+        opponent_model_path=opponent_model,
+    )
 
 
 @app.command("play-vs-model")

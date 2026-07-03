@@ -1,6 +1,6 @@
 # 下一階段訓練計畫（繁體中文）
 
-日期：2026-07-03
+日期：2026-07-03（同日晚間更新：v4 完成，見第 7 節；下次直接跑第 7.3 節的 v5）
 
 本文件是「訓練出更強的 AI、在介面上與人對弈」這個目標的下一步計畫與執行紀錄。閱讀順序上，本文件取代 `docs/NEXT_TRAINING_STEPS.md` 成為目前的行動依據（該文件的 Phase 9D 評估精神已部分落實在本次工作中）。
 
@@ -149,3 +149,58 @@ animal-shogi-lab debug-board --model checkpoints/animal_shogi_maskable_ppo_vs_po
   python -m compileall src
   python -m pytest
   ```
+
+---
+
+## 7. 2026-07-03 晚間更新：v4 結果、對局分析、v5 安排
+
+### 7.1 v4 結果（大成功）
+
+80 分鐘實跑 17.5M 步（平均約 3,600 FPS）。評估：
+
+| 對手 | 局數 | v4 勝率 | 對照（訓練前） |
+|---|---|---|---|
+| heuristic | 200 | **100%** | 0% |
+| random | 100 | **100%** | 100% |
+
+模型：`checkpoints/animal_shogi_maskable_ppo_vs_pool/maskable_ppo_vs_pool_black_20260703_113517/final_model.zip`
+
+### 7.2 人類實測（使用者執白獲勝）的診斷
+
+實測印象：**不再走自殺臭棋，搶子換子都是正著**，前半盤不虧。但輸掉的兩手暴露同一個結構性弱點：
+
+- 長頸鹿走到對方獅子隔壁被白吃（`GIRAFFE 2,1-2,2`）。
+- 吃了被獅子保護的「毒餌」大象，下一手獅子被反吃終局（`LION 1,0x2,1`）。
+
+診斷：**看不見「該格被對方保護」，零算度（lookahead）**。這是純 policy 網路的天花板，
+不是訓練量問題。根治要靠搜索（MCTS），短期可靠更強的對手緩解。
+
+### 7.3 v5：迭代自對弈（下次執行，零新基建）
+
+把 v4 凍結當對手池主力，從 v4 熱啟動繼續練（「窮人版 AlphaZero 迭代」）。
+一鍵腳本已備好，在 PowerShell 貼上：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\run_pool_training_v5.ps1
+```
+
+配置：熱啟動 v4（沿用 256×256/CUDA/24 envs）、對手池 = 凍結 v4 0.5 / heuristic 0.3 / random 0.2、
+seed 1、80 分鐘預算。跑完自動評估三組：
+
+1. **對凍結 v4 200 局（驗收門檻：勝率 > 55%）**——本次新增 `evaluate-model --opponent model` 功能，
+   凍結對手經過鏡射處理可正確執白。
+2. 對 heuristic 100 局（應維持約 100%）
+3. 對 random 100 局（應維持約 100%）
+
+注意：對 v4 的對局是「v5 執黑 vs v4 執白」，與訓練情境一致；v4 執白經鏡射不吃虧，
+但這仍是同池內的相對強度，不是絕對棋力，人類實測仍是最終驗收。
+
+### 7.4 中長期路線圖（通往 AlphaZero）
+
+1. **v6：二層（two-ply）minimax 對手**——會保護自己的子、會設餌，專治「吃毒餌」盲點。
+2. **v7a：推理時 MCTS**——拿現有網路當先驗，下棋時現場搜索。不需重新訓練，
+   棋力立即提升一級，直接補上「算度」。先在 debug-board / evaluate 加 `--mcts-sims N` 選項。
+3. **v7b：完整 AlphaZero-lite**——policy+value 雙頭網路、自對弈棋譜、replay buffer、
+   新舊模型擂台。動物將棋棋盤小，完全可行。
+4. 參考標尺：動物將棋已被完全解析（雙方完美下法下**後手必勝**，約 78 手）。
+   長期可用完美解資料庫驗證棋力上限。

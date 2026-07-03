@@ -414,3 +414,10 @@ def test_evaluate_model_rejects_unknown_opponent() -> None:
     assert res is None
 
 
+def test_evaluate_model_requires_opponent_model_path() -> None:
+    from animal_shogi_ai_lab.eval import evaluate_model
+
+    res = evaluate_model("dummy_path", games=1, opponent_type="model")
+    assert res is None
+
+
