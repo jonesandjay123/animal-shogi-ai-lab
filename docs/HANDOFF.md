@@ -2,6 +2,12 @@
 
 This repo is now past scaffold, rules research, legacy audit, clean engine, UI debug board, and the first useful RL training run.
 
+> **2026-07-03 update:** the 5M vs-heuristic checkpoint described below is not present on the
+> current machine (checkpoints are not versioned); only the 5M vs-random model exists locally.
+> Heuristic evaluation support and an opponent-pool training pipeline were added, the local
+> model was re-baselined (100% vs random, 0% vs heuristic), and a 10M-step vs-pool run was
+> launched. See `docs/NEXT_TRAINING_PLAN_ZH_TW.md` for the current plan.
+
 ## Current Status
 
 - Rules spec: `docs/GAME_RULES.md` is the authority.

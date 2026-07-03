@@ -312,3 +312,105 @@ def test_train_maskable_ppo_vs_heuristic_missing_dependency(capsys) -> None:
         assert "stable-baselines3 and sb3-contrib are required" in captured.out
 
 
+def test_train_maskable_ppo_vs_pool_missing_dependency(capsys) -> None:
+    import sys
+    from unittest import mock
+
+    from animal_shogi_ai_lab.training.train_maskable_ppo_vs_pool import (
+        train_maskable_ppo_vs_pool,
+    )
+
+    with mock.patch.dict(sys.modules, {"sb3_contrib": None}):
+        train_maskable_ppo_vs_pool(side="BLACK", timesteps=10)
+        captured = capsys.readouterr()
+        assert "stable-baselines3 and sb3-contrib are required" in captured.out
+
+
+def test_mirror_action_round_trip() -> None:
+    from animal_shogi_ai_lab.training import mirror_action
+
+    for i in range(132):
+        action = decode_action(i)
+        mirrored = mirror_action(action)
+        assert mirror_action(mirrored) == action
+        # Mirroring keeps on-board squares on the board. Some decodable move
+        # indices point off-board; those are filtered by the action mask.
+        if 0 <= action.to_square.file < 3 and 0 <= action.to_square.rank < 4:
+            assert 0 <= mirrored.to_square.file < 3
+            assert 0 <= mirrored.to_square.rank < 4
+
+
+def test_mirror_action_matches_perspective_flip() -> None:
+    from animal_shogi_ai_lab.training import mirror_action
+
+    # BLACK's opening chick push mirrors to WHITE's chick push.
+    black_push = MoveAction(Square(1, 1), Square(1, 2))
+    assert mirror_action(black_push) == MoveAction(Square(1, 2), Square(1, 1))
+
+
+class _RecordingAgent:
+    def __init__(self, name: str) -> None:
+        self.name = name
+        self.calls = 0
+
+    def select_action(self, state, legal_actions):
+        self.calls += 1
+        return legal_actions[0]
+
+
+def test_opponent_pool_agent_delegates_to_pool_member() -> None:
+    from animal_shogi_ai_lab.agents import OpponentPoolAgent
+
+    agent = _RecordingAgent("only")
+    pool = OpponentPoolAgent([(agent, 1.0)])
+    state = GameState.initial()
+    action = pool.select_action(state, state.legal_actions())
+    assert action in state.legal_actions()
+    assert agent.calls == 1
+
+
+def test_opponent_pool_agent_resamples_on_new_episode(monkeypatch) -> None:
+    from animal_shogi_ai_lab.agents import pool_agent as pool_module
+    from animal_shogi_ai_lab.agents.pool_agent import OpponentPoolAgent
+
+    a = _RecordingAgent("a")
+    b = _RecordingAgent("b")
+    pool = OpponentPoolAgent([(a, 0.5), (b, 0.5)])
+
+    sample_calls = []
+
+    def fake_choices(agents, weights, k):
+        sample_calls.append(len(sample_calls))
+        return [agents[len(sample_calls) % len(agents)]]
+
+    monkeypatch.setattr(pool_module.random, "choices", fake_choices)
+
+    state = GameState.initial()
+    legal = state.legal_actions()
+    later_state = state.apply_action(legal[0])
+
+    pool.select_action(later_state, later_state.legal_actions())  # ply 1: samples
+    assert len(sample_calls) == 1
+    two_ply = later_state.apply_action(later_state.legal_actions()[0])
+    pool.select_action(two_ply, two_ply.legal_actions())  # ply 2: same episode
+    assert len(sample_calls) == 1
+    pool.select_action(later_state, later_state.legal_actions())  # ply back to 1: resample
+    assert len(sample_calls) == 2
+
+
+def test_opponent_pool_agent_rejects_empty_pool() -> None:
+    import pytest
+
+    from animal_shogi_ai_lab.agents import OpponentPoolAgent
+
+    with pytest.raises(ValueError):
+        OpponentPoolAgent([(_RecordingAgent("zero"), 0.0)])
+
+
+def test_evaluate_model_rejects_unknown_opponent() -> None:
+    from animal_shogi_ai_lab.eval import evaluate_model
+
+    res = evaluate_model("dummy_path", games=1, opponent_type="alphazero")
+    assert res is None
+
+

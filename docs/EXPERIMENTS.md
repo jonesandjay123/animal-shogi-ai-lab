@@ -55,6 +55,48 @@ Notes:
   Final 5M model still needs formal evaluation against random and heuristic.
 ```
 
+### 2026-07-03: Local baseline re-measurement (vs-random 5M model)
+
+```text
+Date: 2026-07-03
+Commit: (heuristic evaluation support added the same day)
+Model: checkpoints/animal_shogi_maskable_ppo_vs_random/maskable_ppo_vs_random_black_20260525_140008/final_model.zip
+Note: the 5M vs-heuristic baseline referenced in docs/HANDOFF.md is NOT present
+      on this machine; the vs-random model above is the only local model.
+
+Eval 1: opponent=random, side=BLACK, games=100
+  model wins: 100, opponent wins: 0, draws: 0
+  win rate: 100.00%, invalid actions: 0, average length: 5.44 plies
+
+Eval 2: opponent=heuristic, side=BLACK, games=100
+  model wins: 0, opponent wins: 100, draws: 0
+  win rate: 0.00%, invalid actions: 0, average length: 8.00 plies
+
+Conclusion: the vs-random model fully dominates random play but cannot beat the
+one-ply heuristic at all. Next run targets the heuristic weakness.
+```
+
+### 2026-07-03: `v4_black_10m_vs_pool` (launched, results pending)
+
+```text
+Date: 2026-07-03
+Config:
+  algorithm: MaskablePPO (warm start from vs-random 5M final model)
+  env: AnimalShogiVsOpponentEnv + OpponentPoolAgent
+  opponent pool: heuristic 0.6 / frozen vs-random model 0.2 / random 0.2
+  learning side: BLACK
+  timesteps: 10,000,000
+  n_envs: 8
+  seed: 0
+  step_penalty: -0.0001
+Command: see docs/NEXT_TRAINING_PLAN_ZH_TW.md section 3
+Log: runs/train_vs_pool_20260703.log
+Result: (fill in after evaluation)
+  opponent=heuristic side=BLACK games=200: ____
+  opponent=random    side=BLACK games=200: ____
+Notes: (fill in)
+```
+
 ## Next Experiment
 
 Run Phase 9D evaluation before more training:

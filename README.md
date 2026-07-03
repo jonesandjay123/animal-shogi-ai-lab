@@ -122,6 +122,19 @@ pip install -e ".[dev,ui,rl]"
      --step-penalty -0.0001
    ```
 
+4. **Maskable PPO vs Opponent Pool (Current direction)**:
+   Trains one side against a weighted pool of opponents (heuristic / frozen model / random),
+   sampling one opponent per episode. Supports warm starting from an existing model.
+   ```bash
+   animal-shogi-lab train-maskable-ppo-vs-pool \
+     --side BLACK \
+     --timesteps 10000000 \
+     --n-envs 8 \
+     --init-model <existing_final_model.zip> \
+     --opponent-model <frozen_opponent_model.zip> \
+     --w-heuristic 0.6 --w-model 0.2 --w-random 0.2
+   ```
+
 Training runs save checkpoints, log config parameters, and store tensorboard runs under the ignored `checkpoints/` and `runs/` directories.
 
 The latest completed baseline is documented in
@@ -137,20 +150,23 @@ phase is evaluation and model inspection.
    animal-shogi-lab evaluate-random --games 100
    ```
 
-2. **Model vs Random Agent**:
-   Evaluates a trained model against a random agent, alternating Black/White roles.
+2. **Model vs Random / Heuristic Agent**:
+   Evaluates a trained model against a fixed opponent (`--opponent random` or `--opponent heuristic`),
+   as BLACK, WHITE, or alternating BOTH.
    ```bash
-   animal-shogi-lab evaluate-model --model checkpoints/animal_shogi_maskable_ppo/maskable_ppo_xxxxxx/final_model.zip --games 100
+   animal-shogi-lab evaluate-model --model <final_model.zip> --games 100 --side BLACK --opponent heuristic
    ```
 
 ## Current Status
 
-Clean rules engine MVP, agents, Gymnasium adapters, debug board, and MaskablePPO training pipelines are implemented and verified by tests. The first useful RL baseline is `v3_black_5m_vs_heuristic_baseline`.
+Clean rules engine MVP, agents, Gymnasium adapters, debug board, and MaskablePPO training pipelines are implemented and verified by tests.
 
-Next step: Phase 9D evaluation and model inspection. Start here:
+Current direction (2026-07-03): opponent-pool training warm-started from the local vs-random 5M model,
+targeting the measured weakness against the one-ply heuristic (0% win rate before this run). Start here:
 
+- [`docs/NEXT_TRAINING_PLAN_ZH_TW.md`](docs/NEXT_TRAINING_PLAN_ZH_TW.md) 目前的訓練計畫、已啟動的 run、回來後的檢查清單（繁體中文）。
 - [`docs/HANDOFF.md`](docs/HANDOFF.md) for the current repo state and latest model path.
-- [`docs/NEXT_TRAINING_STEPS.md`](docs/NEXT_TRAINING_STEPS.md) for the concrete next-agent plan.
+- [`docs/NEXT_TRAINING_STEPS.md`](docs/NEXT_TRAINING_STEPS.md) for the earlier Phase 9D/9E plan (partially superseded).
 - [`docs/RL_TRAINING_NOTES.md`](docs/RL_TRAINING_NOTES.md) for why single-policy self-play failed and why vs-opponent training is the current direction.
 - [`docs/EXPERIMENTS.md`](docs/EXPERIMENTS.md) for recorded runs and evaluation commands.
 

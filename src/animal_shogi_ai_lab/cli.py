@@ -107,6 +107,36 @@ def train_maskable_ppo_vs_heuristic_cmd(
     )
 
 
+@app.command("train-maskable-ppo-vs-pool")
+def train_maskable_ppo_vs_pool_cmd(
+    side: str = typer.Option("BLACK", help="The side PPO will control: BLACK or WHITE"),
+    timesteps: int = typer.Option(5000000, help="Number of training timesteps"),
+    n_envs: int = typer.Option(4, help="Number of parallel environments"),
+    seed: int = typer.Option(0, help="Random seed for environments and models"),
+    step_penalty: float = typer.Option(-0.0001, help="Non-terminal step penalty"),
+    init_model: str = typer.Option(None, help="Warm-start learner from this model zip"),
+    opponent_model: str = typer.Option(None, help="Frozen model zip used in the opponent pool"),
+    w_heuristic: float = typer.Option(0.5, help="Pool weight for the heuristic opponent"),
+    w_model: float = typer.Option(0.3, help="Pool weight for the frozen model opponent"),
+    w_random: float = typer.Option(0.2, help="Pool weight for the random opponent"),
+) -> None:
+    """Train a MaskablePPO agent against a weighted opponent pool."""
+    from animal_shogi_ai_lab.training import train_maskable_ppo_vs_pool
+
+    train_maskable_ppo_vs_pool(
+        side=side,
+        timesteps=timesteps,
+        n_envs=n_envs,
+        seed=seed,
+        step_penalty=step_penalty,
+        init_model=init_model,
+        opponent_model=opponent_model,
+        w_heuristic=w_heuristic,
+        w_model=w_model,
+        w_random=w_random,
+    )
+
+
 @app.command("evaluate-model")
 def evaluate_model_cmd(
     model: str = typer.Option(..., help="Path to the saved model zip file"),

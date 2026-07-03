@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-import random
 from typing import Any
 
-from animal_shogi_ai_lab.agents import run_random_self_play
+from animal_shogi_ai_lab.agents import HeuristicAgent, RandomAgent, run_random_self_play
 from animal_shogi_ai_lab.engine import GameState, Player
 from animal_shogi_ai_lab.training import (
     decode_action,
@@ -30,9 +29,10 @@ def evaluate_model(
     side: str = "BOTH",
     opponent_type: str = "random",
 ) -> dict[str, Any] | None:
-    """Evaluates a trained MaskablePPO model against a RandomAgent.
+    """Evaluates a trained MaskablePPO model against a fixed opponent.
 
-    Supports evaluating strictly as BLACK, WHITE, or alternating BOTH sides.
+    Supports ``opponent_type`` "random" or "heuristic", and evaluating strictly
+    as BLACK, WHITE, or alternating BOTH sides.
     """
     try:
         from sb3_contrib import MaskablePPO
@@ -40,6 +40,15 @@ def evaluate_model(
         print("Error: stable-baselines3 and sb3-contrib are required to evaluate a model.")
         print("Please install the reinforcement learning dependencies by running:")
         print("  pip install -e \".[dev,ui,rl]\"")
+        return None
+
+    opponent_name = opponent_type.lower()
+    if opponent_name == "random":
+        opponent = RandomAgent()
+    elif opponent_name == "heuristic":
+        opponent = HeuristicAgent()
+    else:
+        print(f"Unknown opponent type: {opponent_type}. Use 'random' or 'heuristic'.")
         return None
 
     print(f"Loading model from: {model_path}")
@@ -50,13 +59,16 @@ def evaluate_model(
         return None
 
     model_wins = 0
-    random_wins = 0
+    opponent_wins = 0
     draws = 0
     invalid_actions = 0
     total_ply = 0
 
     eval_side = side.upper()
-    print(f"Starting evaluation of {games} games against RandomAgent (Model Side: {eval_side})...")
+    print(
+        f"Starting evaluation of {games} games against {opponent_name} opponent "
+        f"(Model Side: {eval_side})..."
+    )
 
     for i in range(games):
         # Choose side
@@ -97,8 +109,8 @@ def evaluate_model(
 
                 state = state.apply_action(action)
             else:
-                # Random agent's turn
-                action = random.choice(legal)
+                # Opponent's turn
+                action = opponent.select_action(state, legal)
                 state = state.apply_action(action)
 
         total_ply += state.ply
@@ -110,18 +122,19 @@ def evaluate_model(
             elif res.winner is model_player:
                 model_wins += 1
             else:
-                random_wins += 1
+                opponent_wins += 1
         else:
             # Model made an invalid action or terminated without result
-            random_wins += 1
+            opponent_wins += 1
 
     win_rate = model_wins / games if games > 0 else 0.0
     avg_length = total_ply / games if games > 0 else 0.0
 
     print("\nResults:")
     print(f"  Total Games: {games}")
+    print(f"  Opponent: {opponent_name}")
     print(f"  Model Wins: {model_wins}")
-    print(f"  Random Agent Wins: {random_wins}")
+    print(f"  Opponent Wins: {opponent_wins}")
     print(f"  Draws: {draws}")
     print(f"  Model Win Rate: {win_rate * 100:.2f}%")
     print(f"  Invalid Actions by Model: {invalid_actions}")
@@ -129,8 +142,10 @@ def evaluate_model(
 
     return {
         "games": games,
+        "opponent": opponent_name,
+        "side": eval_side,
         "model_wins": model_wins,
-        "random_wins": random_wins,
+        "opponent_wins": opponent_wins,
         "draws": draws,
         "win_rate": win_rate,
         "invalid_actions": invalid_actions,

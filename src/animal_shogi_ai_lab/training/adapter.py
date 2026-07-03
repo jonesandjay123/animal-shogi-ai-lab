@@ -84,6 +84,27 @@ def decode_action(index: int) -> Action:
         return DropAction(piece_kind, Square(to_file, to_rank))
 
 
+def mirror_action(action: Action) -> Action:
+    """Rotates an action 180 degrees on the board.
+
+    Observations are perspective-normalized (rotated for WHITE), but action
+    encoding uses absolute board coordinates. A model trained as BLACK that
+    plays WHITE must therefore predict in its egocentric frame and have the
+    action mirrored back to absolute coordinates (and vice versa for masks).
+    """
+    if isinstance(action, MoveAction):
+        return MoveAction(
+            Square(2 - action.from_square.file, 3 - action.from_square.rank),
+            Square(2 - action.to_square.file, 3 - action.to_square.rank),
+        )
+    if isinstance(action, DropAction):
+        return DropAction(
+            action.piece_kind,
+            Square(2 - action.to_square.file, 3 - action.to_square.rank),
+        )
+    raise TypeError(f"Unknown action type: {type(action)}")
+
+
 def legal_action_mask(state: GameState) -> np.ndarray:
     """Returns a boolean array of shape (132,) where True indicates a legal action."""
     mask = np.zeros(132, dtype=np.bool_)
