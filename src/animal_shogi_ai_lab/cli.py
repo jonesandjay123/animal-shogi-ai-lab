@@ -119,6 +119,12 @@ def train_maskable_ppo_vs_pool_cmd(
     w_heuristic: float = typer.Option(0.5, help="Pool weight for the heuristic opponent"),
     w_model: float = typer.Option(0.3, help="Pool weight for the frozen model opponent"),
     w_random: float = typer.Option(0.2, help="Pool weight for the random opponent"),
+    net_arch: str = typer.Option("64,64", help="Comma-separated MLP layer sizes, e.g. 256,256"),
+    device: str = typer.Option("auto", help="Torch device for the learner: auto, cuda, or cpu"),
+    batch_size: int = typer.Option(64, help="PPO minibatch size (raise for GPU efficiency)"),
+    n_steps: int = typer.Option(2048, help="Rollout length per env before each update"),
+    max_minutes: float = typer.Option(None, help="Stop after this many wall-clock minutes"),
+    subproc: bool = typer.Option(False, help="Use SubprocVecEnv for parallel env stepping"),
 ) -> None:
     """Train a MaskablePPO agent against a weighted opponent pool."""
     from animal_shogi_ai_lab.training import train_maskable_ppo_vs_pool
@@ -134,6 +140,12 @@ def train_maskable_ppo_vs_pool_cmd(
         w_heuristic=w_heuristic,
         w_model=w_model,
         w_random=w_random,
+        net_arch=net_arch,
+        device=device,
+        batch_size=batch_size,
+        n_steps=n_steps,
+        max_minutes=max_minutes,
+        subproc=subproc,
     )
 
 

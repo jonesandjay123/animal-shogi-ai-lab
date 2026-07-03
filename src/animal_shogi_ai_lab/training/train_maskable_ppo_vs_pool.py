@@ -18,17 +18,27 @@ def train_maskable_ppo_vs_pool(
     w_heuristic: float = 0.5,
     w_model: float = 0.3,
     w_random: float = 0.2,
+    net_arch: str = "64,64",
+    device: str = "auto",
+    batch_size: int = 64,
+    n_steps: int = 2048,
+    max_minutes: float | None = None,
+    subproc: bool = False,
 ) -> None:
     """Trains MaskablePPO against a weighted opponent pool.
 
     The pool mixes a one-ply heuristic, an optional frozen model, and a random
     agent. One opponent is sampled per episode per env. ``init_model`` warm
-    starts the learner from an existing checkpoint instead of random weights.
+    starts the learner from an existing checkpoint instead of random weights
+    (ignoring ``net_arch``, since the loaded weights fix the architecture).
+    ``max_minutes`` stops training on a wall-clock budget; the final model is
+    saved either way.
     """
     try:
         from sb3_contrib import MaskablePPO
         from stable_baselines3.common.callbacks import CallbackList, CheckpointCallback
         from stable_baselines3.common.env_util import make_vec_env
+        from stable_baselines3.common.vec_env import SubprocVecEnv
     except ImportError:
         print("Error: stable-baselines3 and sb3-contrib are required for MaskablePPO training.")
         print("Please install the reinforcement learning dependencies by running:")
@@ -38,15 +48,21 @@ def train_maskable_ppo_vs_pool(
     from animal_shogi_ai_lab.agents import HeuristicAgent, RandomAgent
     from animal_shogi_ai_lab.agents.model_agent import ModelOpponentAgent
     from animal_shogi_ai_lab.agents.pool_agent import OpponentPoolAgent
-    from animal_shogi_ai_lab.training.callbacks import ProgressEstimatorCallback
+    from animal_shogi_ai_lab.training.callbacks import (
+        ProgressEstimatorCallback,
+        TimeBudgetCallback,
+    )
     from animal_shogi_ai_lab.training.env_vs_opponent import AnimalShogiVsOpponentEnv
 
     learning_player = Player.BLACK if side.upper() == "BLACK" else Player.WHITE
+    net_arch_layers = [int(x) for x in net_arch.split(",") if x.strip()]
 
     frozen_model = None
     if opponent_model is not None:
         print(f"Loading frozen opponent model from: {opponent_model}")
-        frozen_model = MaskablePPO.load(opponent_model)
+        # Opponent inference is one observation at a time; CPU avoids extra
+        # CUDA contexts (and is required inside subproc workers).
+        frozen_model = MaskablePPO.load(opponent_model, device="cpu")
     elif w_model > 0.0:
         print("No --opponent-model given; dropping the model slot from the pool.")
         w_model = 0.0
@@ -74,6 +90,12 @@ def train_maskable_ppo_vs_pool(
         "opponent_model": opponent_model,
         "init_model": init_model,
         "step_penalty": step_penalty,
+        "net_arch": net_arch_layers,
+        "device": device,
+        "batch_size": batch_size,
+        "n_steps": n_steps,
+        "max_minutes": max_minutes,
+        "subproc": subproc,
         "action_space_size": 132,
         "observation_shape": [126],
         "algorithm": "MaskablePPO_vs_Pool",
@@ -93,7 +115,7 @@ def train_maskable_ppo_vs_pool(
 
     print(
         f"Initializing vs-pool environment ({side.upper()}) with {n_envs} environments "
-        f"(heuristic={w_heuristic}, model={w_model}, random={w_random})..."
+        f"(heuristic={w_heuristic}, model={w_model}, random={w_random}, subproc={subproc})..."
     )
     env = make_vec_env(
         lambda: AnimalShogiVsOpponentEnv(
@@ -103,6 +125,7 @@ def train_maskable_ppo_vs_pool(
         ),
         n_envs=n_envs,
         seed=seed,
+        vec_env_cls=SubprocVecEnv if subproc else None,
     )
 
     tb_log = None
@@ -115,7 +138,7 @@ def train_maskable_ppo_vs_pool(
 
     if init_model is not None:
         print(f"Warm starting learner from: {init_model}")
-        model = MaskablePPO.load(init_model, env=env, tensorboard_log=tb_log)
+        model = MaskablePPO.load(init_model, env=env, tensorboard_log=tb_log, device=device)
     else:
         model = MaskablePPO(
             "MlpPolicy",
@@ -123,7 +146,12 @@ def train_maskable_ppo_vs_pool(
             verbose=0,
             seed=seed,
             tensorboard_log=tb_log,
+            policy_kwargs={"net_arch": net_arch_layers},
+            batch_size=batch_size,
+            n_steps=n_steps,
+            device=device,
         )
+    print(f"Learner device: {model.device} | net_arch: {net_arch_layers}", flush=True)
 
     save_freq = max(50000 // n_envs, 1)
     checkpoint_callback = CheckpointCallback(
@@ -138,10 +166,14 @@ def train_maskable_ppo_vs_pool(
         log_interval=min(10000, max(timesteps // 10, 1)),
     )
 
-    callbacks = CallbackList([checkpoint_callback, progress_callback])
+    callback_items = [checkpoint_callback, progress_callback]
+    if max_minutes is not None:
+        callback_items.append(TimeBudgetCallback(max_minutes=max_minutes))
+    callbacks = CallbackList(callback_items)
 
-    print(f"Starting MaskablePPO vs Pool training for {timesteps} timesteps...")
-    print(f"Saving checkpoints and config to: {checkpoint_dir}")
+    budget_note = f" (time budget: {max_minutes} min)" if max_minutes is not None else ""
+    print(f"Starting MaskablePPO vs Pool training for {timesteps} timesteps{budget_note}...")
+    print(f"Saving checkpoints and config to: {checkpoint_dir}", flush=True)
 
     model.learn(
         total_timesteps=timesteps,

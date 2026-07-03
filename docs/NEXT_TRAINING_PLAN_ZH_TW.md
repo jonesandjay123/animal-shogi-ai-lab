@@ -57,56 +57,68 @@ checkpoints/animal_shogi_maskable_ppo_vs_random/maskable_ppo_vs_random_black_202
 
 ---
 
-## 3. 已啟動的訓練（放著跑）
+## 3. 本輪訓練：由你在自己的 terminal 執行（約 85 分鐘）
+
+**GPU 已就緒**：2026-07-03 已把 CPU 版 PyTorch 換成 `torch 2.11.0+cu128`，實測抓到 RTX 5080。
+
+**環境數 benchmark（實測，256×256 網路 + CUDA）**：
+
+| 配置 | FPS |
+|---|---|
+| 8 envs（DummyVecEnv） | 1,451 |
+| 16 envs（DummyVecEnv） | 1,725 |
+| 16 envs（SubprocVecEnv） | 3,232 |
+| **24 envs（SubprocVecEnv）** | **4,017** ← 採用 |
+
+在 **PowerShell** 貼上這一行即可開跑（進度、FPS、ETA 會直接顯示在畫面上；跑完自動接兩輪評估）：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\run_pool_training.ps1
+```
+
+腳本內容（`scripts/run_pool_training.ps1`）等同於：
 
 ```bash
 animal-shogi-lab train-maskable-ppo-vs-pool \
-  --side BLACK \
-  --timesteps 10000000 \
-  --n-envs 8 \
-  --seed 0 \
+  --side BLACK --timesteps 18000000 --n-envs 24 --seed 0 \
   --step-penalty -0.0001 \
-  --init-model checkpoints/animal_shogi_maskable_ppo_vs_random/maskable_ppo_vs_random_black_20260525_140008/final_model.zip \
   --opponent-model checkpoints/animal_shogi_maskable_ppo_vs_random/maskable_ppo_vs_random_black_20260525_140008/final_model.zip \
-  --w-heuristic 0.6 --w-model 0.2 --w-random 0.2
+  --w-heuristic 0.5 --w-model 0.25 --w-random 0.25 \
+  --net-arch 256,256 --device cuda --batch-size 1024 --n-steps 2048 \
+  --max-minutes 80 --subproc
+# 之後自動：evaluate 200 局 vs heuristic + 100 局 vs random
 ```
 
-- 訓練 log：`runs/train_vs_pool_20260703.log`（含進度百分比與 ETA）
-- checkpoint 目錄：`checkpoints/animal_shogi_maskable_ppo_vs_pool/maskable_ppo_vs_pool_black_<時間戳>/`
-- 每 50,000 步自動存一個 checkpoint，中途停掉也有東西可用。
-- 實測速度約 1,200+ FPS（4 envs 時），10M 步預估數小時內完成。
+設計重點：
+
+- **全新開始 + 256×256 網路**（不熱啟動）：舊模型的 64×64 架構綁死權重形狀，用不到 5080；
+  大網路上限更高，且 18M 步（80 分鐘 × ~4,000 FPS）足夠從零練到超過舊水準。
+- **`--max-minutes 80`**：按牆鐘時間自動停止並存檔，不會超時。
+- 每 50,000 步自動存 checkpoint 到
+  `checkpoints/animal_shogi_maskable_ppo_vs_pool/maskable_ppo_vs_pool_black_<時間戳>/`，
+  中途中斷（Ctrl+C）也有東西可用。
 
 ---
 
-## 4. 回來之後的檢查清單
+## 4. 回來之後：把 terminal 輸出貼回給 Claude 檢查
 
-1. **看訓練進度 / 是否完成**：
+腳本跑完畫面上會有兩塊評估結果（vs heuristic 200 局、vs random 100 局），連同訓練尾段的
+Progress 行一起複製貼回對話即可。
 
-   ```bash
-   tail -20 runs/train_vs_pool_20260703.log
-   ```
+判讀標準：
 
-2. **評估新模型**（把 `<run>` 換成實際目錄名）：
+- 對 heuristic 勝率 **> 50%**：大成功，直接上介面對弈。
+- 對 heuristic 勝率 **10%–50%**：有進步，可加長訓練或做第二輪迭代（見第 5 節）。
+- 對 heuristic 勝率仍接近 **0%**：調整方向（提高 `--w-heuristic`、加訓練時間、或改獎勵）。
+- 對 random 勝率若明顯掉到 90% 以下：代表過度特化，可把 `--w-random` 調高一點重跑。
 
-   ```bash
-   animal-shogi-lab evaluate-model --model checkpoints/animal_shogi_maskable_ppo_vs_pool/<run>/final_model.zip --games 200 --side BLACK --opponent heuristic
-   animal-shogi-lab evaluate-model --model checkpoints/animal_shogi_maskable_ppo_vs_pool/<run>/final_model.zip --games 200 --side BLACK --opponent random
-   ```
+親自上介面對弈（把 `<run>` 換成實際目錄名）：
 
-   判讀標準：
-   - 對 heuristic 勝率 **> 50%**：大成功，直接上介面對弈。
-   - 對 heuristic 勝率 **10%–50%**：有進步，可加長訓練或做第二輪迭代（見第 5 節）。
-   - 對 heuristic 勝率仍接近 **0%**：熱啟動可能被舊策略卡住，改成不帶 `--init-model` 從零開始
-     純 vs-heuristic 訓練（`train-maskable-ppo-vs-heuristic`）再比較。
-   - 對 random 勝率若明顯掉到 90% 以下：代表有遺忘（forgetting），可把 `--w-random` 調高一點重跑。
+```bash
+animal-shogi-lab debug-board --model checkpoints/animal_shogi_maskable_ppo_vs_pool/<run>/final_model.zip --ai-side BLACK
+```
 
-3. **親自上介面對弈**：
-
-   ```bash
-   animal-shogi-lab debug-board --model checkpoints/animal_shogi_maskable_ppo_vs_pool/<run>/final_model.zip --ai-side BLACK
-   ```
-
-4. **把結果記到 `docs/EXPERIMENTS.md`**（已預留條目格式）。
+最後把結果記到 `docs/EXPERIMENTS.md`（已預留條目格式）。
 
 ---
 

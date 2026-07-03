@@ -47,6 +47,34 @@ class ProgressEstimatorCallback(BaseCallback):
                 f"Steps: {current_step:,} / {self.total_timesteps:,} | "
                 f"FPS: {fps:.0f} | "
                 f"Elapsed: {elapsed_str} | "
-                f"ETA: {eta_str}"
+                f"ETA: {eta_str}",
+                flush=True,
             )
+        return True
+
+
+class TimeBudgetCallback(BaseCallback):
+    """Stops training gracefully once a wall-clock budget is exhausted.
+
+    Lets a run be sized by available time ("train for 75 minutes") instead of
+    guessing a timestep count. The model is still saved by the caller after
+    ``learn`` returns.
+    """
+
+    def __init__(self, max_minutes: float, verbose: int = 0):
+        super().__init__(verbose)
+        self.max_seconds = max_minutes * 60.0
+        self.start_time: float | None = None
+
+    def _on_training_start(self) -> None:
+        self.start_time = time.monotonic()
+
+    def _on_step(self) -> bool:
+        if time.monotonic() - self.start_time >= self.max_seconds:
+            print(
+                f"[TimeBudget] {self.max_seconds / 60.0:.1f} minutes reached at "
+                f"step {self.num_timesteps:,}; stopping training.",
+                flush=True,
+            )
+            return False
         return True

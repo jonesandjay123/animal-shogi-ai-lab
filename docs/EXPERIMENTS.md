@@ -76,24 +76,24 @@ Conclusion: the vs-random model fully dominates random play but cannot beat the
 one-ply heuristic at all. Next run targets the heuristic weakness.
 ```
 
-### 2026-07-03: `v4_black_10m_vs_pool` (launched, results pending)
+### 2026-07-03: `v4_black_pool_gpu_fresh256` (prepared; run via scripts/run_pool_training.ps1)
 
 ```text
 Date: 2026-07-03
 Config:
-  algorithm: MaskablePPO (warm start from vs-random 5M final model)
-  env: AnimalShogiVsOpponentEnv + OpponentPoolAgent
-  opponent pool: heuristic 0.6 / frozen vs-random model 0.2 / random 0.2
+  algorithm: MaskablePPO, fresh start, net_arch [256, 256], device cuda (RTX 5080)
+  env: AnimalShogiVsOpponentEnv + OpponentPoolAgent (SubprocVecEnv)
+  opponent pool: heuristic 0.5 / frozen vs-random 5M model 0.25 / random 0.25
   learning side: BLACK
-  timesteps: 10,000,000
-  n_envs: 8
+  timesteps: 18,000,000 target, max_minutes 80 (time-budget stop)
+  n_envs: 24 (benchmarked: ~4,000 FPS; 8 dummy=1,451 / 16 dummy=1,725 / 16 subproc=3,232)
+  batch_size: 1024, n_steps: 2048
   seed: 0
   step_penalty: -0.0001
-Command: see docs/NEXT_TRAINING_PLAN_ZH_TW.md section 3
-Log: runs/train_vs_pool_20260703.log
-Result: (fill in after evaluation)
+Command: powershell -ExecutionPolicy Bypass -File scripts\run_pool_training.ps1
+Result: (fill in after the run)
   opponent=heuristic side=BLACK games=200: ____
-  opponent=random    side=BLACK games=200: ____
+  opponent=random    side=BLACK games=100: ____
 Notes: (fill in)
 ```
 
