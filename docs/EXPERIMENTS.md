@@ -76,7 +76,7 @@ Conclusion: the vs-random model fully dominates random play but cannot beat the
 one-ply heuristic at all. Next run targets the heuristic weakness.
 ```
 
-### 2026-07-03: `v4_black_pool_gpu_fresh256` (prepared; run via scripts/run_pool_training.ps1)
+### 2026-07-03: `v4_black_pool_gpu_fresh256` (COMPLETED — new best model)
 
 ```text
 Date: 2026-07-03
@@ -91,10 +91,21 @@ Config:
   seed: 0
   step_penalty: -0.0001
 Command: powershell -ExecutionPolicy Bypass -File scripts\run_pool_training.ps1
-Result: (fill in after the run)
-  opponent=heuristic side=BLACK games=200: ____
-  opponent=random    side=BLACK games=100: ____
-Notes: (fill in)
+Final model:
+  checkpoints/animal_shogi_maskable_ppo_vs_pool/maskable_ppo_vs_pool_black_20260703_113517/final_model.zip
+Result:
+  Completed 17,497,200+ steps in the 80-minute budget (~3,600 FPS average).
+  opponent=heuristic side=BLACK games=200: 200 wins / 0 losses / 0 draws (100.00%),
+    0 invalid actions, average length 12.88 plies
+  opponent=random    side=BLACK games=100: 100 wins / 0 losses / 0 draws (100.00%),
+    0 invalid actions, average length 5.86 plies
+Notes:
+  Massive jump: the previous local model (vs-random 5M, 64x64 net) scored 0% vs
+  heuristic; this fresh 256x256 GPU-trained pool model scores 100% vs both
+  opponents. The one-ply heuristic is now fully dominated, so it no longer
+  provides training signal. Next iteration needs stronger opponents (freeze
+  this model into the pool, two-ply heuristic, or MCTS baseline). Human
+  playtest on the debug board is the remaining subjective check.
 ```
 
 ## Next Experiment
